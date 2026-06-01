@@ -47,13 +47,18 @@ class EngineState:
     taxa_liquida_01: float = 0.0
     taxa_liquida_02: float = 0.0
 
-    # Cenário ativo (Slice 4)
+    # Cenário ativo
     scenario_active: str | None = None
     scenario_ticks_remaining: int | None = None
+
+    # Sequência de startup em execução
+    startup_active: bool = False
 
     def status(self) -> str:
         if self.paused:
             return "PAUSADO"
+        if self.startup_active:
+            return "INICIANDO"
         if self.scenario_active is not None:
             return "CENARIO_ATIVO"
         return "RODANDO"

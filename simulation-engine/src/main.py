@@ -1,20 +1,24 @@
+import asyncio
 import os
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from fastapi import FastAPI
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
 
 from .rain import generate_rain_series
+from .scenarios import apply_scenario, tick_scenario
 from .sensors import compute_tick
+from .startup import run_startup_sequence
 from .state import EngineState
 
 API_URL = os.getenv("API_INTERNAL_URL", "http://backend-api:8000")
 
 state = EngineState()
 http_client: httpx.AsyncClient | None = None
+scheduler: AsyncIOScheduler | None = None
 
 
 SENSOR_UNITS: dict[str, str | None] = {
@@ -78,6 +82,7 @@ async def simulation_tick() -> None:
     # cache do backend atualizado (e sobreviver a restarts do backend).
     if not state.paused:
         compute_tick(state)
+        tick_scenario(state)
 
     payload = build_payload(state)
     if http_client is not None:
@@ -92,7 +97,7 @@ async def simulation_tick() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global http_client
+    global http_client, scheduler
     state.rain_series = generate_rain_series()
     state.rain_series_original = list(state.rain_series)
     http_client = httpx.AsyncClient()
@@ -147,4 +152,71 @@ async def engine_resume() -> dict[str, Any]:
         state.paused = False
         state.paused_reason = None
         print(f"[engine] resumed (was {previous})", flush=True)
+    return {"ok": True}
+
+
+class SpeedBody(BaseModel):
+    fator: float = Field(ge=0.1, le=100.0)
+
+
+@app.post("/engine/speed")
+async def engine_speed(body: SpeedBody) -> dict[str, Any]:
+    """Altera fator_aceleracao e reescalona o job do APScheduler."""
+    state.fator_aceleracao = body.fator
+    if scheduler is not None:
+        scheduler.reschedule_job(
+            "simulation_tick",
+            trigger="interval",
+            seconds=1.0 / body.fator,
+        )
+    print(f"[engine] speed -> {body.fator}x (interval={1.0/body.fator}s)", flush=True)
+    return {"ok": True, "fator": body.fator}
+
+
+class AdjustBody(BaseModel):
+    comporta_01: float = Field(ge=0.0, le=100.0)
+    comporta_02: float = Field(ge=0.0, le=100.0)
+    comporta_03: float = Field(ge=0.0, le=100.0)
+    comporta_04: float = Field(ge=0.0, le=100.0)
+    turbina: Literal["LIGADO", "DESLIGADO"]
+
+
+@app.post("/engine/adjust")
+async def engine_adjust(body: AdjustBody) -> dict[str, Any]:
+    """Aplica novos valores de comportas e estado da turbina ao estado."""
+    if body.comporta_02 > body.comporta_03:
+        raise HTTPException(
+            status_code=422,
+            detail="comporta_02 não pode exceder comporta_03 (restrição operacional)",
+        )
+    state.comporta_01 = body.comporta_01
+    state.comporta_02 = body.comporta_02
+    state.comporta_03 = body.comporta_03
+    state.comporta_04 = body.comporta_04
+    state.sensor_turbina_01 = body.turbina
+    return {"ok": True}
+
+
+class ScenarioBody(BaseModel):
+    tipo: Literal["chuva_intensa", "seca"]
+    duracao_dias: int
+
+
+@app.post("/engine/scenario")
+async def engine_scenario(body: ScenarioBody) -> dict[str, Any]:
+    """Ativa cenário de chuva intensa ou seca. Sobrepõe sensor_chuva_01 enquanto ativo."""
+    try:
+        apply_scenario(state, body.tipo, body.duracao_dias)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    print(f"[engine] scenario started: {body.tipo} for {body.duracao_dias} days", flush=True)
+    return {"ok": True, "tipo": body.tipo, "duracao_dias": body.duracao_dias}
+
+
+@app.post("/engine/start")
+async def engine_start() -> dict[str, Any]:
+    """Dispara a sequência automática de startup em task de background."""
+    if state.startup_active:
+        raise HTTPException(status_code=409, detail="startup já em execução")
+    asyncio.create_task(run_startup_sequence(state))
     return {"ok": True}

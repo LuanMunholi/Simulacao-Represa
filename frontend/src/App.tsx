@@ -29,6 +29,7 @@ interface Tick {
   status: string;
   paused_reason: string | null;
   scenario_active: string | null;
+  scenario_ticks_remaining: number | null;
   sensors: Record<string, SensorEntry>;
   derived: {
     capacidade_atual: number;
@@ -94,6 +95,53 @@ const SEVERITY_COLORS: Record<string, string> = {
   CRITICO: "#dc2626",
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  RODANDO: "RODANDO",
+  PAUSADO: "PAUSADO",
+  INICIANDO: "INICIANDO",
+  CENARIO_ATIVO: "CENÁRIO ATIVO",
+};
+
+const buttonStyle: React.CSSProperties = {
+  background: "#334155",
+  color: "#e2e8f0",
+  border: "1px solid #475569",
+  borderRadius: 4,
+  padding: "6px 12px",
+  cursor: "pointer",
+  fontSize: 13,
+  fontFamily: "inherit",
+};
+
+const primaryButtonStyle: React.CSSProperties = {
+  ...buttonStyle,
+  background: "#2563eb",
+  borderColor: "#1d4ed8",
+};
+
+const urgentButtonStyle: React.CSSProperties = {
+  ...buttonStyle,
+  background: "#dc2626",
+  borderColor: "#991b1b",
+  fontWeight: 600,
+};
+
+async function postJson(path: string, body?: object): Promise<Response> {
+  return fetch(path, {
+    method: "POST",
+    headers: body ? { "Content-Type": "application/json" } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+}
+
+// Slider 0–100 maps logarithmically to 0.1x–100x
+function speedFromSlider(v: number): number {
+  return Math.pow(10, (v / 100) * 3 - 1);
+}
+function speedToSlider(s: number): number {
+  return ((Math.log10(s) + 1) / 3) * 100;
+}
+
 function formatValue(valor: number | string): string {
   if (typeof valor === "string") return valor;
   return valor.toFixed(2);
@@ -102,10 +150,8 @@ function formatValue(valor: number | string): string {
 function SensorCard({ id, entry }: { id: string; entry: SensorEntry }) {
   return (
     <div style={{
-      background: "#1e293b",
-      border: "1px solid #334155",
-      borderRadius: 8,
-      padding: 14,
+      background: "#1e293b", border: "1px solid #334155",
+      borderRadius: 8, padding: 14,
     }}>
       <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 6 }}>
         {SENSOR_LABELS[id] ?? id}
@@ -130,11 +176,140 @@ function SeverityBadge({ severidade }: { severidade: string }) {
   return (
     <span style={{
       fontSize: 11, padding: "2px 6px", borderRadius: 4,
-      background: color, color: "#fff", fontWeight: 600,
-      marginRight: 8,
+      background: color, color: "#fff", fontWeight: 600, marginRight: 8,
     }}>
       {severidade}
     </span>
+  );
+}
+
+function ControlPanel({ data }: { data: Tick | null }) {
+  const fator = data?.fator_aceleracao ?? 1.0;
+  const [sliderPos, setSliderPos] = useState<number>(() => speedToSlider(fator));
+  const [feedback, setFeedback] = useState<string>("");
+  const status = data?.status;
+  const isCriticPause =
+    status === "PAUSADO" && data?.paused_reason === "previsao_critica";
+  const isStarting = status === "INICIANDO";
+
+  // Sync slider with backend on connect/changes outside the slider
+  useEffect(() => {
+    if (data) setSliderPos(speedToSlider(data.fator_aceleracao));
+  }, [data?.fator_aceleracao]);
+
+  async function call(label: string, path: string, body?: object) {
+    setFeedback(`${label}…`);
+    try {
+      const res = await postJson(path, body);
+      if (res.ok) {
+        setFeedback(`${label} OK`);
+      } else {
+        const detail = await res.text();
+        setFeedback(`${label} falhou (${res.status}): ${detail.slice(0, 120)}`);
+      }
+    } catch (e) {
+      setFeedback(`${label} erro: ${e}`);
+    }
+    setTimeout(() => setFeedback(""), 4000);
+  }
+
+  function commitSpeed() {
+    const fator = Math.round(speedFromSlider(sliderPos) * 10) / 10;
+    call(`Velocidade ${fator}x`, "/api/simulation/speed", { fator });
+  }
+
+  const currentSpeed = speedFromSlider(sliderPos);
+
+  return (
+    <section style={{
+      background: "#1e293b", border: "1px solid #334155",
+      borderRadius: 8, padding: 16, marginBottom: 16,
+    }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <button
+          style={primaryButtonStyle}
+          onClick={() => call("Iniciar barragem", "/api/simulation/start")}
+          disabled={isStarting}
+        >
+          {isStarting ? "Iniciando…" : "Iniciar Barragem"}
+        </button>
+
+        <button
+          style={isCriticPause ? urgentButtonStyle : buttonStyle}
+          onClick={() => call("Ajustar comportas", "/api/simulation/adjust")}
+        >
+          {isCriticPause ? "Ajustar Comportas (CRÍTICO)" : "Ajustar Comportas"}
+        </button>
+
+        <button
+          style={buttonStyle}
+          onClick={() =>
+            status === "PAUSADO"
+              ? call("Retomar", "/api/simulation/resume")
+              : call("Pausar", "/api/simulation/pause")
+          }
+        >
+          {status === "PAUSADO" ? "Retomar" : "Pausar"}
+        </button>
+      </div>
+
+      <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ fontSize: 12, color: "#94a3b8", minWidth: 80 }}>Velocidade</span>
+        <input
+          type="range" min={0} max={100} step={0.5}
+          value={sliderPos}
+          onChange={(e) => setSliderPos(parseFloat(e.target.value))}
+          onMouseUp={commitSpeed}
+          onTouchEnd={commitSpeed}
+          style={{ flex: 1, maxWidth: 240 }}
+        />
+        <span style={{ fontSize: 13, fontFamily: "ui-monospace, monospace", minWidth: 60 }}>
+          {currentSpeed.toFixed(1)}x
+        </span>
+      </div>
+
+      <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+        <span style={{ fontSize: 12, color: "#94a3b8" }}>Chuva intensa:</span>
+        {[1, 7, 15].map((d) => (
+          <button
+            key={`chuva-${d}`}
+            style={buttonStyle}
+            onClick={() =>
+              call(`Chuva ${d}d`, "/api/simulation/scenario", { tipo: "chuva_intensa", duracao_dias: d })
+            }
+          >
+            {d}d
+          </button>
+        ))}
+        <span style={{ fontSize: 12, color: "#94a3b8", marginLeft: 12 }}>Seca:</span>
+        {[15, 30, 60].map((d) => (
+          <button
+            key={`seca-${d}`}
+            style={buttonStyle}
+            onClick={() =>
+              call(`Seca ${d}d`, "/api/simulation/scenario", { tipo: "seca", duracao_dias: d })
+            }
+          >
+            {d}d
+          </button>
+        ))}
+      </div>
+
+      {data?.scenario_active && (
+        <div style={{ marginTop: 10, fontSize: 12, color: "#cbd5e1" }}>
+          Cenário ativo: <strong>{data.scenario_active}</strong>
+          {data.scenario_ticks_remaining != null && (
+            <> — {data.scenario_ticks_remaining}h restantes ({(data.scenario_ticks_remaining / 24).toFixed(1)} dias)</>
+          )}
+        </div>
+      )}
+
+      {feedback && (
+        <div style={{ marginTop: 10, fontSize: 12, color: "#94a3b8", fontFamily: "ui-monospace, monospace" }}>
+          {feedback}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -230,11 +405,13 @@ export default function App() {
             background: isPaused ? "#dc2626" : "#334155",
             color: isPaused ? "#fff" : "#cbd5e1",
           }}>
-            {data?.status ?? "—"}
+            {data ? STATUS_LABELS[data.status] ?? data.status : "—"}
             {isPaused && data?.paused_reason ? ` (${data.paused_reason})` : ""}
           </span>
         </div>
       </header>
+
+      <ControlPanel data={data} />
 
       {data && data.active_risks.length > 0 && (
         <section style={{ marginBottom: 16 }}>

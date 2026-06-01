@@ -1,9 +1,11 @@
 import os
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 
+from ..adjustment import compute_adjustment
 from ..state_cache import state_cache
 
 router = APIRouter(prefix="/simulation", tags=["simulation"])
@@ -34,3 +36,73 @@ async def simulation_resume() -> dict[str, Any]:
         resp = await client.post(f"{ENGINE_URL}/engine/resume")
         resp.raise_for_status()
     return {"ok": True}
+
+
+@router.post("/start", status_code=202)
+async def simulation_start() -> dict[str, Any]:
+    """Dispara a sequência automática de startup da barragem."""
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        resp = await client.post(f"{ENGINE_URL}/engine/start")
+        if resp.status_code == 409:
+            raise HTTPException(status_code=409, detail=resp.json().get("detail"))
+        resp.raise_for_status()
+    return {"ok": True}
+
+
+class SpeedBody(BaseModel):
+    fator: float = Field(ge=0.1, le=100.0)
+
+
+@router.post("/speed")
+async def simulation_speed(body: SpeedBody) -> dict[str, Any]:
+    """Altera o fator_aceleracao do engine (reescalona o loop de simulação)."""
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        resp = await client.post(f"{ENGINE_URL}/engine/speed", json={"fator": body.fator})
+        resp.raise_for_status()
+    return {"ok": True, "fator": body.fator}
+
+
+class ScenarioBody(BaseModel):
+    tipo: Literal["chuva_intensa", "seca"]
+    duracao_dias: int
+
+
+@router.post("/scenario", status_code=202)
+async def simulation_scenario(body: ScenarioBody) -> dict[str, Any]:
+    """Inicia cenário de chuva intensa ou seca."""
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        resp = await client.post(
+            f"{ENGINE_URL}/engine/scenario",
+            json={"tipo": body.tipo, "duracao_dias": body.duracao_dias},
+        )
+        if resp.status_code == 422:
+            raise HTTPException(status_code=422, detail=resp.json().get("detail"))
+        resp.raise_for_status()
+    return {"ok": True, "tipo": body.tipo, "duracao_dias": body.duracao_dias}
+
+
+@router.post("/adjust")
+async def simulation_adjust() -> dict[str, Any]:
+    """Calcula novos valores de comportas + turbina, aplica via engine, retoma se pausado."""
+    cached = await state_cache.get()
+    if cached is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Estado da simulação ainda não disponível",
+        )
+
+    sensors = cached.get("sensors", {})
+    derived = cached.get("derived", {})
+    if not sensors:
+        raise HTTPException(status_code=503, detail="Sensores ainda não disponíveis")
+
+    ajuste = compute_adjustment(sensors, derived)
+
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        resp = await client.post(f"{ENGINE_URL}/engine/adjust", json=ajuste)
+        resp.raise_for_status()
+        # Retoma independente do motivo da pausa
+        if cached.get("status") == "PAUSADO":
+            await client.post(f"{ENGINE_URL}/engine/resume")
+
+    return {"ok": True, "ajuste_aplicado": ajuste}

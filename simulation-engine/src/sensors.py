@@ -1,3 +1,4 @@
+from .scenarios import SCENARIO_RAIN_OVERRIDE
 from .state import EngineState
 
 TANK_VOLUME_M3 = 10_000.0  # capacidade máxima de cada tanque
@@ -19,9 +20,12 @@ def compute_tick(state: EngineState) -> None:
 
     Ordem de dependência conforme SLA 3.6.
     """
-    # 1. Chuva do dia atual (indexação por dia, não por tick)
-    dia_atual = state.simulated_hours // 24
-    state.sensor_chuva_01 = state.rain_series[dia_atual % 364]
+    # 1. Chuva — cenário ativo sobrepõe a série; senão indexa por dia
+    if state.scenario_active in SCENARIO_RAIN_OVERRIDE:
+        state.sensor_chuva_01 = SCENARIO_RAIN_OVERRIDE[state.scenario_active]
+    else:
+        dia_atual = state.simulated_hours // 24
+        state.sensor_chuva_01 = state.rain_series[dia_atual % 364]
 
     # 2. Janela deslizante de 720h (= 30 dias) — sensor_chuva_02 é o acumulado
     state.chuva_window.append(state.sensor_chuva_01)

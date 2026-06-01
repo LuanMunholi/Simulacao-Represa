@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
+from pydantic import BaseModel
 
 from .rain import generate_rain_series
 from .sensors import compute_tick
@@ -72,16 +73,21 @@ def build_payload(s: EngineState) -> dict[str, Any]:
 
 
 async def simulation_tick() -> None:
-    if state.paused:
-        return
-    compute_tick(state)
+    # Quando pausado, o tempo não avança nem os sensores são recalculados,
+    # mas o engine ainda emite "heartbeat" com o estado atual para manter o
+    # cache do backend atualizado (e sobreviver a restarts do backend).
+    if not state.paused:
+        compute_tick(state)
+
     payload = build_payload(state)
     if http_client is not None:
         try:
             await http_client.post(f"{API_URL}/internal/tick", json=payload, timeout=2.0)
         except Exception as e:
             print(f"[engine] tick {state.simulated_hours} POST failed: {e}", flush=True)
-    state.simulated_hours += 1
+
+    if not state.paused:
+        state.simulated_hours += 1
 
 
 @asynccontextmanager
@@ -118,3 +124,27 @@ async def health() -> dict[str, Any]:
         "paused": state.paused,
         "paused_reason": state.paused_reason,
     }
+
+
+class PauseBody(BaseModel):
+    reason: str  # "manual" | "previsao_critica"
+
+
+@app.post("/engine/pause")
+async def engine_pause(body: PauseBody) -> dict[str, Any]:
+    """Pausa o loop de simulação. Idempotente — não sobrescreve paused_reason existente."""
+    if not state.paused:
+        state.paused = True
+        state.paused_reason = body.reason
+        print(f"[engine] paused (reason={body.reason})", flush=True)
+    return {"ok": True, "paused_reason": state.paused_reason}
+
+
+@app.post("/engine/resume")
+async def engine_resume() -> dict[str, Any]:
+    if state.paused:
+        previous = state.paused_reason
+        state.paused = False
+        state.paused_reason = None
+        print(f"[engine] resumed (was {previous})", flush=True)
+    return {"ok": True}

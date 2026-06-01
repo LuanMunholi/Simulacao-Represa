@@ -1,4 +1,6 @@
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
+from typing import Any
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -10,22 +12,54 @@ from .routers import internal
 from .state_cache import state_cache
 from .ws_manager import manager
 
+BASE_DATE = datetime(2026, 1, 1, 0, 0)
+TURBINA_STATE_TO_FLOAT = {"LIGADO": 1.0, "DESLIGADO": 0.0}
+
+
+def format_simulated_time(simulated_hours: int) -> str:
+    dt = BASE_DATE + timedelta(hours=simulated_hours)
+    return f"Dia {dt.day}, Mês {dt.month} de {dt.year}, às {dt.hour:02d}:{dt.minute:02d}"
+
+
+def _sensor_valor_to_float(valor: Any) -> float:
+    if isinstance(valor, str):
+        return TURBINA_STATE_TO_FLOAT.get(valor, 0.0)
+    return float(valor)
+
+
+def make_broadcast_payload(tick: dict[str, Any]) -> dict[str, Any]:
+    return {
+        **tick,
+        "simulated_time": format_simulated_time(tick["simulated_hours"]),
+        "alert_level": "VERDE",
+        "active_risks": [],
+        "active_predictions": [],
+    }
+
 
 async def display_tick() -> None:
     tick = await state_cache.get()
     if tick is None:
         return
-    async with async_session() as session:
-        await session.execute(
-            insert(SensorReading).values(
-                simulated_timestamp=tick["simulated_hours"],
-                sensor_id="dummy",
-                valor=tick["dummy_value"],
-                unidade=None,
-            )
-        )
-        await session.commit()
-    await manager.broadcast(tick)
+
+    simulated_ts = tick["simulated_hours"]
+    sensors = tick.get("sensors", {})
+
+    rows = [
+        {
+            "simulated_timestamp": simulated_ts,
+            "sensor_id": sid,
+            "valor": _sensor_valor_to_float(reading["valor"]),
+            "unidade": reading.get("unidade"),
+        }
+        for sid, reading in sensors.items()
+    ]
+    if rows:
+        async with async_session() as session:
+            await session.execute(insert(SensorReading), rows)
+            await session.commit()
+
+    await manager.broadcast(make_broadcast_payload(tick))
 
 
 @asynccontextmanager
@@ -56,7 +90,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
     try:
         last = await state_cache.get()
         if last is not None:
-            await ws.send_json(last)
+            await ws.send_json(make_broadcast_payload(last))
         while True:
             await ws.receive_text()
     except WebSocketDisconnect:

@@ -262,7 +262,9 @@ Onde:
 
 - **sensor_turbina_01** — Indica o estado atual da turbina da passagem de água (ligado ou desligado)
   - o valor inicial deve ser desligado
-  - abrir as comportas 02 e 03 implica que a turbina deve estar ligada, caso contrário isto deve ser um risco
+  - o estado da turbina é **controlado de forma independente** das comportas — definido pela sequência de startup (Seção 9), pelo algoritmo de ajuste automático (Seção 8) ou por comando explícito via `/engine/adjust` (campo `turbina`)
+  - regra operacional: a turbina **deve** estar ligada sempre que as comportas 02 e 03 estiverem abertas, e desligada quando estiverem fechadas; qualquer desvio é detectado como risco (ver Riscos 8 e 9 na Seção 6)
+  - o motor de simulação (`compute_tick`) **não** deriva o estado da turbina — apenas lê `state.sensor_turbina_01` para calcular `sensor_energia_01`
 
 - **sensor_energia_01** — Mede a quantidade de energia sendo gerada pela turbina (em kilowats por hora)
   - o valor só irá variar caso a turbina 01 esteja ligada, caso contrário o valor lido é 0
@@ -733,6 +735,7 @@ Esse painel será usado para visualizar a simulação da barragem em tempo real.
     - tanque inferior acima de 90% → reduzir comporta_03 e/ou aumentar comporta_04;
     - tanque inferior abaixo de 20% → aumentar comporta_03 e/ou reduzir comporta_04;
     - a restrição comporta_02 ≤ comporta_03 deve ser sempre respeitada durante o ajuste;
+    - após calcular os novos valores das comportas, definir o estado da turbina para manter o invariante operacional: `turbina = "LIGADO"` se `comporta_02 > 0` E `comporta_03 > 0`; caso contrário `"DESLIGADO"` (evita disparar os Riscos 8 e 9);
   - após o cálculo, os novos estados das comportas são aplicados e o painel de monitoramento reflete imediatamente os efeitos.
 
 ### Componentes visuais
@@ -926,7 +929,7 @@ Definir e aplicar o schema PostgreSQL via Alembic:
   - `id`, `simulated_timestamp`, `sensor_id`, `valor`, `unidade`
   - índice em (`sensor_id`, `simulated_timestamp`) para queries de histórico mensal
 - **`alert_history`** — histórico de alertas e previsões
-  - `id`, `simulated_timestamp`, `tipo` (risco | previsão), `severidade`, `mensagem`, `leituras` (JSON)
+  - `id`, `simulated_timestamp`, `tipo` (`risco` | `previsao`), `severidade`, `mensagem`, `leituras` (JSON)
 
 ### Fase 3 — Simulation Engine
 
@@ -953,9 +956,11 @@ Serviço FastAPI com dois loops próprios via APScheduler:
 - **Endpoints REST**:
   - `GET /state` — estado atual da simulação e leituras dos sensores
   - `POST /simulation/start` — iniciar sequência de startup da barragem
+  - `POST /simulation/pause` — pausar manualmente a simulação (`paused_reason = "manual"`); idempotente; não sobrescreve pausa por previsão crítica
+  - `POST /simulation/resume` — retomar simulação após pausa manual; rejeita (409) se pausa atual for `previsao_critica`
   - `POST /simulation/speed` — alterar `fator_aceleração`; reescalona loop de simulação
   - `POST /simulation/scenario` — iniciar simulação de chuva intensa ou seca com duração selecionada
-  - `POST /simulation/adjust` — acionar ajuste automático de comportas; retoma simulação se pausada
+  - `POST /simulation/adjust` — acionar ajuste automático de comportas e turbina; retoma simulação se pausada (por qualquer motivo)
   - `GET /history/alerts` — histórico de alertas (paginado)
   - `GET /history/sensors/{sensor_id}` — histórico de leituras de um sensor (últimas N horas simuladas)
 - **WebSocket `/ws`**: broadcast do estado completo a cada tick do loop de display; gerenciar múltiplas conexões simultâneas

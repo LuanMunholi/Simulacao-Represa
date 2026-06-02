@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 
+import { EnergyChart } from "./components/charts/EnergyChart";
+import { RainChart } from "./components/charts/RainChart";
+import { VolumeChart } from "./components/charts/VolumeChart";
 import { useWebSocket } from "./hooks/useWebSocket";
 
 interface SensorEntry {
@@ -453,17 +456,37 @@ export default function App() {
         </section>
       )}
 
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-        gap: 10, marginBottom: 24,
-      }}>
-        {SENSOR_ORDER.map((id) => {
-          const entry = data?.sensors?.[id];
-          if (!entry) return null;
-          return <SensorCard key={id} id={id} entry={entry} />;
-        })}
-      </div>
+      <section style={{ marginBottom: 24 }}>
+        <h2 style={{ fontSize: 14, color: "#94a3b8", margin: "0 0 8px" }}>
+          Sensores em tempo real
+        </h2>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+          gap: 10,
+        }}>
+          {SENSOR_ORDER.map((id) => {
+            const entry = data?.sensors?.[id];
+            if (!entry) return null;
+            return <SensorCard key={id} id={id} entry={entry} />;
+          })}
+        </div>
+      </section>
+
+      <section style={{ marginBottom: 24 }}>
+        <h2 style={{ fontSize: 14, color: "#94a3b8", margin: "0 0 8px" }}>
+          Gráficos — últimas 720 horas simuladas
+        </h2>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))",
+          gap: 12,
+        }}>
+          <VolumeChart />
+          <RainChart />
+          <EnergyChart />
+        </div>
+      </section>
 
       <section>
         <h2 style={{ fontSize: 14, color: "#94a3b8", margin: "0 0 8px" }}>

@@ -97,7 +97,10 @@ async def display_tick() -> None:
 
     # Quando pausado o engine não emite ticks novos — não persistir leituras nem alertas;
     # apenas re-broadcastar o estado em cache pros clientes conectados.
-    if not is_paused:
+    # Também pular persistência se o tick atual tem o mesmo simulated_timestamp do anterior
+    # (ocorre quando fator_aceleracao < 1: display roda mais rápido que o engine).
+    if not is_paused and simulated_ts != state_cache.last_persisted_ts:
+        state_cache.last_persisted_ts = simulated_ts
         sensor_rows = [
             {
                 "simulated_timestamp": simulated_ts,

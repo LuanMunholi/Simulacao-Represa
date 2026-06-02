@@ -12,13 +12,6 @@ import {
 import { useSensorHistory } from "../../hooks/useSensorHistory";
 import { mergeSeries } from "./merge";
 
-const chartContainerStyle: React.CSSProperties = {
-  background: "#1e293b",
-  border: "1px solid #334155",
-  borderRadius: 8,
-  padding: 16,
-};
-
 const tooltipStyle: React.CSSProperties = {
   background: "#0f172a",
   border: "1px solid #334155",
@@ -35,8 +28,8 @@ export function RainChart() {
   ]);
 
   return (
-    <div style={chartContainerStyle}>
-      <h3 style={{ fontSize: 13, color: "#94a3b8", margin: "0 0 12px" }}>
+    <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+      <h3 className="text-[13px] text-slate-400 m-0 mb-3">
         Chuva — atual (mm/h) e acumulada 30d (mm)
       </h3>
       <ResponsiveContainer width="100%" height={220}>

@@ -62,6 +62,45 @@ async def get_alerts(
     }
 
 
+@router.get("/alert-counts")
+async def get_alert_counts(
+    horas: int = Query(720, ge=1, le=10000),
+    tipo: str | None = Query(None, description="Filtra por tipo: 'risco' ou 'previsao'"),
+) -> dict[str, Any]:
+    """Contagem de novos alertas por simulated_timestamp nas últimas N horas.
+
+    Cada linha de `alert_history` representa um alerta que apareceu (transição
+    inativo→ativo). O agregado serve como proxy de atividade de risco por hora.
+    """
+    async with async_session() as session:
+        latest_q = await session.execute(
+            select(func.max(AlertHistory.simulated_timestamp))
+        )
+        latest = latest_q.scalar() or 0
+        cutoff = max(0, latest - horas + 1)
+
+        query = (
+            select(
+                AlertHistory.simulated_timestamp,
+                func.count().label("count"),
+            )
+            .where(AlertHistory.simulated_timestamp >= cutoff)
+            .group_by(AlertHistory.simulated_timestamp)
+            .order_by(AlertHistory.simulated_timestamp.asc())
+        )
+        if tipo is not None:
+            query = query.where(AlertHistory.tipo == tipo)
+
+        result = await session.execute(query)
+        rows = result.all()
+
+    return {
+        "horas": horas,
+        "tipo": tipo,
+        "items": [{"simulated_timestamp": ts, "count": c} for ts, c in rows],
+    }
+
+
 @router.get("/sensors/{sensor_id}")
 async def get_sensor_history(
     sensor_id: str,

@@ -1,20 +1,14 @@
-import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
 
 import { AlertHistoryTable } from "../components/AlertHistoryTable";
+import { ComportaControlCard } from "../components/ComportaControlCard";
 import { SensorCard } from "../components/SensorCard";
 import { SeverityBadge } from "../components/SeverityBadge";
 import { EnergyChart } from "../components/charts/EnergyChart";
 import { RainChart } from "../components/charts/RainChart";
 import { RiskCountChart } from "../components/charts/RiskCountChart";
 import { VolumeChart } from "../components/charts/VolumeChart";
-import {
-  BTN,
-  BTN_URGENT,
-  CHUVA_WINDOW_DAYS,
-  SENSOR_CATEGORIES,
-  SEVERITY_BORDER,
-} from "../constants";
+import { CHUVA_WINDOW_DAYS, SENSOR_CATEGORIES, SEVERITY_BORDER } from "../constants";
 import type { LayoutContext, SensorEntry } from "../types";
 
 // O engine expõe sensor_chuva_02 como total de mm acumulado na janela de 30 dias.
@@ -35,44 +29,9 @@ function displayEntry(
 
 export function MonitoringPanel() {
   const { data } = useOutletContext<LayoutContext>();
-  const [adjustFeedback, setAdjustFeedback] = useState<string>("");
-
-  const hasAlerts = data
-    ? data.active_risks.length > 0 ||
-      data.active_predictions.length > 0 ||
-      data.status === "PAUSADO"
-    : false;
-  const isCriticPause =
-    data?.status === "PAUSADO" && data?.paused_reason === "previsao_critica";
-
-  async function handleAdjust() {
-    setAdjustFeedback("Ajustando comportas…");
-    try {
-      const res = await fetch("/api/simulation/adjust", { method: "POST" });
-      if (res.ok) setAdjustFeedback("Ajuste aplicado");
-      else setAdjustFeedback(`Falhou: HTTP ${res.status}`);
-    } catch (e) {
-      setAdjustFeedback(`Erro: ${e}`);
-    }
-    setTimeout(() => setAdjustFeedback(""), 4000);
-  }
 
   return (
     <>
-      {hasAlerts && (
-        <div className="flex items-center gap-3 mb-4">
-          <button
-            className={isCriticPause ? BTN_URGENT : BTN}
-            onClick={handleAdjust}
-          >
-            {isCriticPause ? "Ajustar Comportas (CRÍTICO)" : "Ajustar Comportas"}
-          </button>
-          {adjustFeedback && (
-            <span className="text-xs text-slate-400 font-mono">{adjustFeedback}</span>
-          )}
-        </div>
-      )}
-
       {data && data.active_risks.length > 0 && (
         <section className="mb-4">
           <h2 className="text-sm text-slate-400 m-0 mb-2">
@@ -114,6 +73,10 @@ export function MonitoringPanel() {
           </ul>
         </section>
       )}
+
+      <section className="mb-6">
+        <ComportaControlCard />
+      </section>
 
       <section className="mb-6">
         <h2 className="text-sm text-slate-400 m-0 mb-2">Sensores em tempo real</h2>

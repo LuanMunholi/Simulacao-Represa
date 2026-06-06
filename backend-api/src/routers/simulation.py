@@ -81,6 +81,38 @@ async def simulation_scenario(body: ScenarioBody) -> dict[str, Any]:
     return {"ok": True, "tipo": body.tipo, "duracao_dias": body.duracao_dias}
 
 
+class ManualAdjustBody(BaseModel):
+    comporta_01: float = Field(ge=0.0, le=100.0)
+    comporta_02: float = Field(ge=0.0, le=100.0)
+    comporta_03: float = Field(ge=0.0, le=100.0)
+    comporta_04: float = Field(ge=0.0, le=100.0)
+    turbina: Literal["LIGADO", "DESLIGADO"]
+
+
+@router.post("/manual-adjust")
+async def simulation_manual_adjust(body: ManualAdjustBody) -> dict[str, Any]:
+    """Aplica valores de comportas + turbina definidos manualmente pelo operador.
+
+    Substitui (na UI) o ajuste automático: o controle das comportas passa a ser
+    do usuário, em tempo real. Mantém a restrição operacional do engine
+    (comporta_02 ≤ comporta_03, rejeitada com 422).
+
+    Se a simulação estiver pausada por previsão crítica, retoma após aplicar —
+    preservando o fluxo de recuperação que o ajuste automático oferecia. Uma
+    pausa manual NÃO é desfeita, para não surpreender quem pausou de propósito.
+    """
+    ajuste = body.model_dump()
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        resp = await client.post(f"{ENGINE_URL}/engine/adjust", json=ajuste)
+        if resp.status_code == 422:
+            raise HTTPException(status_code=422, detail=resp.json().get("detail"))
+        resp.raise_for_status()
+        cached = await state_cache.get()
+        if cached and cached.get("paused_reason") == "previsao_critica":
+            await client.post(f"{ENGINE_URL}/engine/resume")
+    return {"ok": True, "ajuste_aplicado": ajuste}
+
+
 @router.post("/adjust")
 async def simulation_adjust() -> dict[str, Any]:
     """Calcula novos valores de comportas + turbina, aplica via engine, retoma se pausado."""

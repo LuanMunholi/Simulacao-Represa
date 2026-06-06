@@ -2,7 +2,7 @@ export const SENSOR_LABELS: Record<string, string> = {
   sensor_volume_01: "Volume Tanque Superior",
   sensor_volume_02: "Volume Tanque Inferior",
   sensor_chuva_01: "Chuva atual",
-  sensor_chuva_02: "Chuva acumulada (30d)",
+  sensor_chuva_02: "Chuva média diária (30d)",
   sensor_turbina_01: "Turbina",
   sensor_energia_01: "Energia gerada",
   sensor_comporta_01: "Comporta 01 — Enchimento Sup.",
@@ -15,15 +15,33 @@ export const SENSOR_LABELS: Record<string, string> = {
   sensor_esvaziamento_01: "Taxa de esvaziamento",
 };
 
-export const SENSOR_ORDER: string[] = [
-  "sensor_volume_01", "sensor_volume_02",
-  "sensor_chuva_01", "sensor_chuva_02",
-  "sensor_turbina_01", "sensor_energia_01",
-  "sensor_comporta_01", "sensor_enchimento_01",
-  "sensor_comporta_02", "sensor_fluxo_01",
-  "sensor_comporta_03", "sensor_fluxo_02",
-  "sensor_comporta_04", "sensor_esvaziamento_01",
+export interface SensorCategory {
+  title: string;
+  sensors: string[];
+}
+
+export const SENSOR_CATEGORIES: SensorCategory[] = [
+  { title: "Volume dos tanques", sensors: ["sensor_volume_01", "sensor_volume_02"] },
+  { title: "Chuvas", sensors: ["sensor_chuva_01", "sensor_chuva_02"] },
+  { title: "Turbina + energia", sensors: ["sensor_turbina_01", "sensor_energia_01"] },
+  {
+    title: "Comportas",
+    sensors: [
+      "sensor_comporta_01",
+      "sensor_comporta_02",
+      "sensor_comporta_03",
+      "sensor_comporta_04",
+    ],
+  },
+  {
+    title: "Enchimento + esvaziamento",
+    sensors: ["sensor_enchimento_01", "sensor_esvaziamento_01"],
+  },
+  { title: "Fluxos", sensors: ["sensor_fluxo_01", "sensor_fluxo_02"] },
 ];
+
+// Janela de chuva acumulada (dias) usada para derivar a média diária no card.
+export const CHUVA_WINDOW_DAYS = 30;
 
 export const ALERT_BG: Record<string, string> = {
   VERDE: "bg-green-600",

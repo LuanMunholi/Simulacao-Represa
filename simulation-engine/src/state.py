@@ -11,8 +11,10 @@ class EngineState:
     fator_aceleracao: float = 1.0
 
     # Controle de execução
-    paused: bool = False
-    paused_reason: str | None = None
+    # Começa pausada: a simulação só avança após "Iniciar Barragem" (/engine/start),
+    # que retoma o loop e dispara a sequência de startup.
+    paused: bool = True
+    paused_reason: str | None = "manual"
 
     # Série de chuva (gerada no startup do engine)
     rain_series: list[float] = field(default_factory=list)

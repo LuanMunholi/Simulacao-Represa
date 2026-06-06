@@ -17,6 +17,10 @@ async def run_startup_sequence(state: EngineState) -> None:
     if state.startup_active:
         return
     state.startup_active = True
+    # A simulação inicia pausada; "Iniciar Barragem" retoma o loop para que os
+    # sensores voltem a ser calculados e os tanques possam encher.
+    state.paused = False
+    state.paused_reason = None
     try:
         # Estágio 1: encher tanque superior
         state.comporta_01 = 100.0

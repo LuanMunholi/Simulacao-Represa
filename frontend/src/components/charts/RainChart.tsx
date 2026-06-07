@@ -10,6 +10,7 @@ import {
 } from "recharts";
 
 import { useSensorHistory } from "../../hooks/useSensorHistory";
+import { Card } from "../Card";
 import { mergeSeries } from "./merge";
 
 const tooltipStyle: React.CSSProperties = {
@@ -28,10 +29,7 @@ export function RainChart() {
   ]);
 
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
-      <h3 className="text-[13px] text-slate-400 m-0 mb-3">
-        Chuva — atual (mm/h) e acumulada 30d (mm)
-      </h3>
+    <Card title="Chuva — atual (mm/h) e acumulada 30d (mm)">
       <ResponsiveContainer width="100%" height={220}>
         <LineChart data={data} margin={{ top: 5, right: 50, left: 0, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
@@ -75,6 +73,6 @@ export function RainChart() {
           />
         </LineChart>
       </ResponsiveContainer>
-    </div>
+    </Card>
   );
 }

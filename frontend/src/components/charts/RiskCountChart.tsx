@@ -9,6 +9,8 @@ import {
   YAxis,
 } from "recharts";
 
+import { Card } from "../Card";
+
 interface AlertCountPoint {
   simulated_timestamp: number;
   count: number;
@@ -45,10 +47,7 @@ export function RiskCountChart() {
   }, []);
 
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
-      <h3 className="text-[13px] text-slate-400 m-0 mb-3">
-        Atividade de alertas (novos por hora simulada)
-      </h3>
+    <Card title="Atividade de alertas (novos por hora simulada)">
       <ResponsiveContainer width="100%" height={220}>
         <BarChart data={items} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
@@ -66,6 +65,6 @@ export function RiskCountChart() {
           <Bar dataKey="count" fill="#ef4444" isAnimationActive={false} />
         </BarChart>
       </ResponsiveContainer>
-    </div>
+    </Card>
   );
 }

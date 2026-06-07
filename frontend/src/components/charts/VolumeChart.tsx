@@ -11,6 +11,7 @@ import {
 } from "recharts";
 
 import { useSensorHistory } from "../../hooks/useSensorHistory";
+import { Card } from "../Card";
 import { mergeSeries } from "./merge";
 
 const tooltipStyle: React.CSSProperties = {
@@ -29,10 +30,7 @@ export function VolumeChart() {
   ]);
 
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
-      <h3 className="text-[13px] text-slate-400 m-0 mb-3">
-        Volume dos tanques (%)
-      </h3>
+    <Card title="Volume dos tanques (%)">
       <ResponsiveContainer width="100%" height={220}>
         <LineChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
@@ -65,6 +63,6 @@ export function VolumeChart() {
           />
         </LineChart>
       </ResponsiveContainer>
-    </div>
+    </Card>
   );
 }

@@ -18,14 +18,28 @@ export const SENSOR_LABELS: Record<string, string> = {
 export interface SensorCategory {
   title: string;
   sensors: string[];
+  accent: keyof typeof ACCENT;
 }
 
 export const SENSOR_CATEGORIES: SensorCategory[] = [
-  { title: "Volume dos tanques", sensors: ["sensor_volume_01", "sensor_volume_02"] },
-  { title: "Chuvas", sensors: ["sensor_chuva_01", "sensor_chuva_02"] },
-  { title: "Turbina + energia", sensors: ["sensor_turbina_01", "sensor_energia_01"] },
+  {
+    title: "Volume dos tanques",
+    accent: "water",
+    sensors: ["sensor_volume_01", "sensor_volume_02"],
+  },
+  {
+    title: "Chuvas",
+    accent: "rain",
+    sensors: ["sensor_chuva_01", "sensor_chuva_02"],
+  },
+  {
+    title: "Turbina + energia",
+    accent: "energy",
+    sensors: ["sensor_turbina_01", "sensor_energia_01"],
+  },
   {
     title: "Comportas",
+    accent: "gate",
     sensors: [
       "sensor_comporta_01",
       "sensor_comporta_02",
@@ -35,10 +49,22 @@ export const SENSOR_CATEGORIES: SensorCategory[] = [
   },
   {
     title: "Enchimento + esvaziamento",
+    accent: "flow",
     sensors: ["sensor_enchimento_01", "sensor_esvaziamento_01"],
   },
-  { title: "Fluxos", sensors: ["sensor_fluxo_01", "sensor_fluxo_02"] },
+  { title: "Fluxos", accent: "stream", sensors: ["sensor_fluxo_01", "sensor_fluxo_02"] },
 ];
+
+// Acento visual por categoria (ponto colorido no título + barra lateral nos cards).
+// Tons escolhidos para não colidir com o vermelho/âmbar do sistema de perigo.
+export const ACCENT = {
+  water: { dot: "bg-sky-400", bar: "border-l-sky-500/70" },
+  rain: { dot: "bg-cyan-400", bar: "border-l-cyan-500/70" },
+  energy: { dot: "bg-emerald-400", bar: "border-l-emerald-500/70" },
+  gate: { dot: "bg-violet-400", bar: "border-l-violet-500/70" },
+  flow: { dot: "bg-teal-400", bar: "border-l-teal-500/70" },
+  stream: { dot: "bg-blue-400", bar: "border-l-blue-500/70" },
+} as const;
 
 // Janela de chuva acumulada (dias) usada para derivar a média diária no card.
 export const CHUVA_WINDOW_DAYS = 30;
@@ -74,6 +100,23 @@ export const STATUS_LABELS: Record<string, string> = {
   INICIANDO: "INICIANDO",
   CENARIO_ATIVO: "CENÁRIO ATIVO",
 };
+
+// Estado de saúde geral (a partir do alert_level) — usado no cabeçalho.
+export const ALERT_HEALTH: Record<
+  string,
+  { label: string; dot: string; text: string; ring: string }
+> = {
+  VERDE: { label: "SAUDÁVEL", dot: "bg-emerald-400", text: "text-emerald-300", ring: "ring-emerald-500/40" },
+  AMARELO: { label: "ATENÇÃO", dot: "bg-amber-400", text: "text-amber-300", ring: "ring-amber-500/40" },
+  LARANJA: { label: "ALERTA", dot: "bg-orange-400", text: "text-orange-300", ring: "ring-orange-500/40" },
+  VERMELHO: { label: "CRÍTICO", dot: "bg-red-500", text: "text-red-300", ring: "ring-red-500/40" },
+};
+
+// Superfície padrão de card e título de seção — base da linguagem de design.
+export const CARD =
+  "bg-slate-800/70 border border-slate-700/80 rounded-xl shadow-sm shadow-black/20";
+export const SECTION_TITLE =
+  "text-xs font-semibold uppercase tracking-wider text-slate-400 m-0";
 
 export const BTN =
   "px-3 py-1.5 text-sm rounded border border-slate-600 bg-slate-700 text-slate-200 " +

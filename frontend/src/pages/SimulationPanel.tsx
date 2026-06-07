@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 
+import { Card } from "../components/Card";
 import { BTN, BTN_PRIMARY } from "../constants";
 import type { LayoutContext } from "../types";
 
@@ -54,9 +55,8 @@ export function SimulationPanel() {
   const currentSpeed = speedFromSlider(sliderPos);
 
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-lg p-5">
-      <section>
-        <h2 className="text-sm text-slate-400 m-0 mb-3">Controle da simulação</h2>
+    <div className="flex flex-col gap-4 max-w-3xl">
+      <Card title="Controle da simulação" bodyClassName="p-5">
         <div className="flex flex-wrap gap-2 items-center">
           <button
             className={BTN_PRIMARY}
@@ -77,10 +77,9 @@ export function SimulationPanel() {
             {status === "PAUSADO" ? "Retomar" : "Pausar"}
           </button>
         </div>
-      </section>
+      </Card>
 
-      <section className="mt-5">
-        <h2 className="text-sm text-slate-400 m-0 mb-3">Velocidade da simulação</h2>
+      <Card title="Velocidade da simulação" bodyClassName="p-5">
         <div className="flex items-center gap-3">
           <span className="text-xs text-slate-400 min-w-[40px]">0.1x</span>
           <input
@@ -99,11 +98,9 @@ export function SimulationPanel() {
             {currentSpeed.toFixed(1)}x
           </span>
         </div>
-      </section>
+      </Card>
 
-      <section className="mt-5">
-        <h2 className="text-sm text-slate-400 m-0 mb-3">Cenários</h2>
-
+      <Card title="Cenários" bodyClassName="p-5">
         <div className="flex flex-wrap gap-2 items-center mb-2">
           <span className="text-xs text-slate-400 min-w-[100px]">Chuva intensa:</span>
           {[1, 7, 15].map((d) => (
@@ -139,22 +136,22 @@ export function SimulationPanel() {
             </button>
           ))}
         </div>
-      </section>
 
-      {data?.scenario_active && (
-        <div className="mt-4 px-3 py-2 bg-slate-900 border border-slate-700 rounded text-xs text-slate-300">
-          Cenário ativo: <strong>{data.scenario_active}</strong>
-          {data.scenario_ticks_remaining != null && (
-            <>
-              {" "}— {data.scenario_ticks_remaining}h restantes (
-              {(data.scenario_ticks_remaining / 24).toFixed(1)} dias)
-            </>
-          )}
-        </div>
-      )}
+        {data?.scenario_active && (
+          <div className="mt-4 px-3 py-2 bg-slate-900/70 border border-slate-700 rounded text-xs text-slate-300">
+            Cenário ativo: <strong>{data.scenario_active}</strong>
+            {data.scenario_ticks_remaining != null && (
+              <>
+                {" "}— {data.scenario_ticks_remaining}h restantes (
+                {(data.scenario_ticks_remaining / 24).toFixed(1)} dias)
+              </>
+            )}
+          </div>
+        )}
+      </Card>
 
       {feedback && (
-        <div className="mt-3 text-xs text-slate-400 font-mono">{feedback}</div>
+        <div className="text-xs text-slate-400 font-mono">{feedback}</div>
       )}
     </div>
   );

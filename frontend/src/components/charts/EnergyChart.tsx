@@ -9,6 +9,7 @@ import {
 } from "recharts";
 
 import { useSensorHistory } from "../../hooks/useSensorHistory";
+import { Card } from "../Card";
 
 const tooltipStyle: React.CSSProperties = {
   background: "#0f172a",
@@ -25,10 +26,7 @@ export function EnergyChart() {
   }));
 
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
-      <h3 className="text-[13px] text-slate-400 m-0 mb-3">
-        Energia gerada (kW/h)
-      </h3>
+    <Card title="Energia gerada (kW/h)">
       <ResponsiveContainer width="100%" height={220}>
         <AreaChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
           <defs>
@@ -54,6 +52,6 @@ export function EnergyChart() {
           />
         </AreaChart>
       </ResponsiveContainer>
-    </div>
+    </Card>
   );
 }

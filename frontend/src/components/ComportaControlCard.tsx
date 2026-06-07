@@ -3,6 +3,7 @@ import { useOutletContext } from "react-router-dom";
 
 import { BTN, BTN_PRIMARY, SENSOR_LABELS } from "../constants";
 import type { LayoutContext } from "../types";
+import { Card } from "./Card";
 
 type ComportaKey =
   | "comporta_01"
@@ -89,16 +90,17 @@ export function ComportaControlCard() {
   }
 
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-lg p-5">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm text-slate-400 m-0">Controle das comportas</h2>
-        {dirty && (
+    <Card
+      title="Controle das comportas"
+      right={
+        dirty ? (
           <span className="text-[11px] text-amber-400 font-mono">
             alterações pendentes
           </span>
-        )}
-      </div>
-
+        ) : undefined
+      }
+      bodyClassName="p-5"
+    >
       <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-x-6 gap-y-3">
         {COMPORTAS.map(({ key, sensorId }) => (
           <div key={key}>
@@ -127,11 +129,22 @@ export function ComportaControlCard() {
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-400">Turbina:</span>
           <button
-            className={BTN}
+            className={
+              turbina === "LIGADO"
+                ? "px-3 py-1.5 text-sm rounded border border-emerald-700 bg-emerald-600/20 text-emerald-300 font-medium hover:bg-emerald-600/30 cursor-pointer transition-colors"
+                : BTN
+            }
             onClick={toggleTurbina}
             aria-pressed={turbina === "LIGADO"}
           >
-            {turbina === "LIGADO" ? "LIGADO" : "DESLIGADO"}
+            <span className="inline-flex items-center gap-1.5">
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  turbina === "LIGADO" ? "bg-emerald-400" : "bg-slate-500"
+                }`}
+              />
+              {turbina === "LIGADO" ? "LIGADO" : "DESLIGADO"}
+            </span>
           </button>
         </div>
 
@@ -154,7 +167,7 @@ export function ComportaControlCard() {
       {feedback && (
         <div className="mt-2 text-xs text-slate-400 font-mono">{feedback}</div>
       )}
-    </div>
+    </Card>
   );
 }
 

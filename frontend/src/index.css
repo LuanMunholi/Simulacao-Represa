@@ -7,6 +7,15 @@
   --font-mono:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
     "Courier New", monospace;
+
+  /* Paleta semântica — linguagem de design "sala de controle" */
+  --color-brand: #38bdf8; /* água / acento principal */
+  --color-water: #38bdf8;
+  --color-energy: #22c55e;
+  --color-ok: #10b981;
+  --color-warn: #f59e0b;
+  --color-alert: #f97316;
+  --color-danger: #ef4444;
 }
 
 html,
@@ -17,8 +26,68 @@ body {
 body {
   margin: 0;
   min-height: 100vh;
+  /* Fundo escuro com leve profundidade radial (sutil, tipo painel industrial) */
   background-color: var(--color-slate-900);
+  background-image:
+    radial-gradient(1100px 600px at 85% -12%, rgba(56, 189, 248, 0.06), transparent 60%),
+    radial-gradient(900px 500px at -5% 0%, rgba(99, 102, 241, 0.05), transparent 55%);
+  background-attachment: fixed;
   color: var(--color-slate-200);
   font-family: var(--font-sans);
   line-height: 1.5;
+}
+
+/* Sliders alinhados ao acento de água */
+input[type="range"] {
+  accent-color: var(--color-sky-500);
+}
+
+/* ---- Esquema da represa (DamSchematic) ---- */
+
+/* Nível de água sobe/desce suavemente quando os volumes mudam */
+.dam-water {
+  transition: y 0.5s ease, height 0.5s ease, fill 0.4s ease;
+}
+
+/* Turbina gira quando ligada */
+@keyframes dam-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.dam-blades {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.dam-blades.on {
+  animation: dam-spin 1.6s linear infinite;
+}
+
+/* Chuva caindo */
+@keyframes dam-rain-fall {
+  0% {
+    transform: translateY(-6px);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.75;
+  }
+  100% {
+    transform: translateY(42px);
+    opacity: 0;
+  }
+}
+.dam-rain {
+  transform-box: fill-box;
+  animation: dam-rain-fall 1.1s linear infinite;
+}
+
+/* Fluxo de água nos tubos (traço deslizante) */
+@keyframes dam-flow-dash {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+.dam-flow {
+  animation: dam-flow-dash 0.9s linear infinite;
 }

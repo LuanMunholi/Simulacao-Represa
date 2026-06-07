@@ -29,7 +29,7 @@ def _build_message(time_str: str, tipo: str, tank_name: str, tempo: float, sever
     if severidade == "CRITICO":
         return (
             f"{time_str} - CRÍTICO: Previsão de {event} no Tanque {tank_name} "
-            f"em aproximadamente {tempo:.1f}h. Simulação pausada para intervenção."
+            f"em aproximadamente {tempo:.1f}h. Aja agora nas comportas para evitar a falha!"
         )
     return (
         f"{time_str} - ALERTA: Previsão de {event} no Tanque {tank_name} "

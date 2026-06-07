@@ -36,6 +36,13 @@ export interface Tick {
   alert_level: string;
   active_risks: RiskEntry[];
   active_predictions: PredictionEntry[];
+  game_over: GameOver | null;
+}
+
+export interface GameOver {
+  tanque: string;
+  sensor: string;
+  tipo: "esvaziou" | "transbordou";
 }
 
 export interface AlertHistoryItem {

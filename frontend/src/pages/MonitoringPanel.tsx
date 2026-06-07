@@ -9,7 +9,6 @@ import { SeverityBadge } from "../components/SeverityBadge";
 import { useSensorTrails } from "../hooks/useSensorTrails";
 import { EnergyChart } from "../components/charts/EnergyChart";
 import { RainChart } from "../components/charts/RainChart";
-import { RiskCountChart } from "../components/charts/RiskCountChart";
 import { VolumeChart } from "../components/charts/VolumeChart";
 import {
   ACCENT,
@@ -34,6 +33,11 @@ function displayEntry(
     return { valor: entry.valor / dias, unidade: "mm/dia" };
   }
   return entry;
+}
+
+// Severidade crítica (risco "CRITICA" ou previsão "CRITICO") → card pisca em vermelho.
+function isCritical(severidade: string): boolean {
+  return severidade === "CRITICA" || severidade === "CRITICO";
 }
 
 // Cor do valor conforme a saúde da leitura. Os volumes são os indicadores
@@ -67,8 +71,10 @@ export function MonitoringPanel() {
             {data.active_risks.map((r) => (
               <li
                 key={r.codigo}
-                className={`bg-slate-800 border border-slate-700 border-l-4 rounded px-3 py-2 text-sm ${
-                  SEVERITY_BORDER[r.severidade] ?? "border-l-slate-500"
+                className={`border border-l-4 rounded px-3 py-2 text-sm ${
+                  isCritical(r.severidade)
+                    ? "alert-blink text-red-50 font-medium"
+                    : `bg-slate-800 border-slate-700 ${SEVERITY_BORDER[r.severidade] ?? "border-l-slate-500"}`
                 }`}
               >
                 <SeverityBadge severidade={r.severidade} />
@@ -88,8 +94,10 @@ export function MonitoringPanel() {
             {data.active_predictions.map((p, i) => (
               <li
                 key={i}
-                className={`bg-slate-800 border border-slate-700 border-l-4 rounded px-3 py-2 text-sm ${
-                  SEVERITY_BORDER[p.severidade] ?? "border-l-slate-500"
+                className={`border border-l-4 rounded px-3 py-2 text-sm ${
+                  isCritical(p.severidade)
+                    ? "alert-blink text-red-50 font-medium"
+                    : `bg-slate-800 border-slate-700 ${SEVERITY_BORDER[p.severidade] ?? "border-l-slate-500"}`
                 }`}
               >
                 <SeverityBadge severidade={p.severidade} />
@@ -100,7 +108,7 @@ export function MonitoringPanel() {
         </section>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(340px,1fr)_minmax(320px,1fr)] gap-4 mb-6 items-start">
+      <div className="flex flex-col gap-4 mb-6">
         <DamSchematic />
         <ComportaControlCard />
       </div>
@@ -140,7 +148,6 @@ export function MonitoringPanel() {
           <VolumeChart />
           <RainChart />
           <EnergyChart />
-          <RiskCountChart />
         </div>
       </section>
 

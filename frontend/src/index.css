@@ -66,14 +66,14 @@ input[type="range"] {
 /* Chuva caindo */
 @keyframes dam-rain-fall {
   0% {
-    transform: translateY(-6px);
+    transform: translateY(-4px);
     opacity: 0;
   }
   20% {
     opacity: 0.75;
   }
   100% {
-    transform: translateY(42px);
+    transform: translateY(24px);
     opacity: 0;
   }
 }
@@ -90,4 +90,54 @@ input[type="range"] {
 }
 .dam-flow {
   animation: dam-flow-dash 0.9s linear infinite;
+}
+
+/* Fluxo nos tubos grossos do esquema horizontal (dasharray 14 14) */
+@keyframes dam-flow-move {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+.dam-flow-lg {
+  animation: dam-flow-move 0.7s linear infinite;
+}
+
+/* Comporta vertical: preenchimento cresce da base; anima y e altura */
+.dam-gate {
+  transition: y 0.4s ease, height 0.4s ease, fill 0.3s ease;
+}
+
+/* Alerta crítico piscando em vermelho (chama atenção sem pausar a simulação) */
+@keyframes alert-blink {
+  0%,
+  100% {
+    background-color: rgb(127 29 29 / 0.55); /* red-900 */
+    border-color: rgb(239 68 68 / 0.9); /* red-500 */
+    box-shadow: 0 0 0 0 rgb(239 68 68 / 0);
+  }
+  50% {
+    background-color: rgb(153 27 27 / 0.85); /* red-800 */
+    border-color: rgb(248 113 113 / 1); /* red-400 */
+    box-shadow: 0 0 14px 1px rgb(239 68 68 / 0.55);
+  }
+}
+.alert-blink {
+  animation: alert-blink 1s ease-in-out infinite;
+}
+
+/* Setas de entrada/saída marchando */
+@keyframes dam-march {
+  0%,
+  100% {
+    transform: translateX(-3px);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translateX(3px);
+    opacity: 1;
+  }
+}
+.dam-march {
+  transform-box: fill-box;
+  animation: dam-march 0.9s ease-in-out infinite;
 }

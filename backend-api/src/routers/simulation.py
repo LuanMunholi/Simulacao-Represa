@@ -25,16 +25,29 @@ async def simulation_pause() -> dict[str, Any]:
 
 @router.post("/resume")
 async def simulation_resume() -> dict[str, Any]:
-    """Retoma após pausa manual. Rejeita 409 se pausa atual for previsao_critica."""
+    """Retoma após pausa manual. Rejeita 409 em fim de jogo (só /simulation/reset sai)."""
     cached = await state_cache.get()
-    if cached and cached.get("paused_reason") == "previsao_critica":
+    if cached and cached.get("paused_reason") == "fim_de_jogo":
         raise HTTPException(
             status_code=409,
-            detail="Simulação pausada por previsão crítica — use /simulation/adjust",
+            detail="Fim de jogo — reinicie a simulação para continuar.",
         )
     async with httpx.AsyncClient(timeout=5.0) as client:
         resp = await client.post(f"{ENGINE_URL}/engine/resume")
         resp.raise_for_status()
+    return {"ok": True}
+
+
+@router.post("/reset")
+async def simulation_reset() -> dict[str, Any]:
+    """Reinicia a simulação (nova partida). Usado após fim de jogo."""
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        resp = await client.post(f"{ENGINE_URL}/engine/reset")
+        resp.raise_for_status()
+    # Limpa o bookkeeping de alertas/persistência para a nova partida.
+    state_cache.previous_risk_codes = set()
+    state_cache.previous_prediction_keys = set()
+    state_cache.last_persisted_ts = None
     return {"ok": True}
 
 

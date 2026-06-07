@@ -27,6 +27,10 @@ export function SimulationPanel() {
   const [feedback, setFeedback] = useState<string>("");
   const status = data?.status;
   const isStarting = status === "INICIANDO";
+  // A barragem já foi iniciada se o loop avançou (horas > 0) ou se está
+  // iniciando/rodando. Uma vez ligada, o botão "Iniciar Barragem" fica
+  // permanentemente desativado (não se inicia duas vezes).
+  const hasStarted = isStarting || status === "RODANDO" || status === "CENARIO_ATIVO" || (data?.simulated_hours ?? 0) > 0;
 
   useEffect(() => {
     if (data) setSliderPos(speedToSlider(data.fator_aceleracao));
@@ -61,13 +65,14 @@ export function SimulationPanel() {
           <button
             className={BTN_PRIMARY}
             onClick={() => call("Iniciar barragem", "/api/simulation/start")}
-            disabled={isStarting}
+            disabled={hasStarted}
           >
-            {isStarting ? "Iniciando…" : "Iniciar Barragem"}
+            {hasStarted ? "Barragem ligada ✓" : "Iniciar Barragem"}
           </button>
 
           <button
             className={BTN}
+            disabled={!hasStarted}
             onClick={() =>
               status === "PAUSADO"
                 ? call("Retomar", "/api/simulation/resume")
@@ -77,6 +82,19 @@ export function SimulationPanel() {
             {status === "PAUSADO" ? "Retomar" : "Pausar"}
           </button>
         </div>
+
+        {hasStarted && (
+          <div className="mt-3 flex items-center gap-2 text-sm">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="text-slate-300">
+              {isStarting
+                ? "Barragem ligada — enchendo os tanques…"
+                : status === "PAUSADO"
+                  ? "Barragem ligada (pausada)"
+                  : "Barragem ligada e em operação"}
+            </span>
+          </div>
+        )}
       </Card>
 
       <Card title="Velocidade da simulação" bodyClassName="p-5">

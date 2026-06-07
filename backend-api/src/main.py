@@ -51,6 +51,28 @@ def _serialize_risks(risks) -> list[dict[str, Any]]:
     ]
 
 
+def detect_tank_failure(sensors: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
+    """Fim de jogo: um tanque esvaziou (≤0%) ou transbordou (≥100%).
+
+    Retorna detalhes para o frontend exibir o aviso de reinício, ou None se OK.
+    """
+    for sid, nome in (
+        ("sensor_volume_01", "Tanque Superior"),
+        ("sensor_volume_02", "Tanque Inferior"),
+    ):
+        entry = sensors.get(sid)
+        if entry is None:
+            continue
+        vol = entry.get("valor")
+        if not isinstance(vol, (int, float)):
+            continue
+        if vol >= 100:
+            return {"tanque": nome, "sensor": sid, "tipo": "transbordou"}
+        if vol <= 0:
+            return {"tanque": nome, "sensor": sid, "tipo": "esvaziou"}
+    return None
+
+
 def _serialize_predictions(predictions) -> list[dict[str, Any]]:
     return [
         {
@@ -72,12 +94,14 @@ def build_broadcast(tick: dict[str, Any]) -> dict[str, Any]:
     time_alert = format_alert(simulated_ts)
     risks = evaluate_risks(sensors, derived, time_alert) if sensors else []
     predictions = compute_predictions(sensors, derived, time_alert) if sensors else []
+    game_over = detect_tank_failure(sensors) if tick.get("paused_reason") == "fim_de_jogo" else None
     return {
         **tick,
         "simulated_time": format_display(simulated_ts),
         "alert_level": aggregate_alert_level(risks),
         "active_risks": _serialize_risks(risks),
         "active_predictions": _serialize_predictions(predictions),
+        "game_over": game_over,
     }
 
 
@@ -146,12 +170,16 @@ async def display_tick() -> None:
                     await session.execute(insert(AlertHistory), alert_rows)
                 await session.commit()
 
-        # Pausa preventiva por previsão crítica
-        if any(p.severidade == "CRITICO" for p in predictions):
-            await pause_engine("previsao_critica")
-            # Atualiza o cache para refletir a pausa imediatamente no próximo broadcast
-            tick["status"] = "PAUSADO"
-            tick["paused_reason"] = "previsao_critica"
+    # Fim de jogo: tanque esvaziou (≤0%) ou transbordou (≥100%) durante operação.
+    # Não pausamos mais por previsão crítica — apenas neste caso real de falha.
+    # Exige simulated_hours > 0 para não confundir o estado inicial (tanques em 0%
+    # antes do enchimento) com uma falha real.
+    running = tick.get("status") in ("RODANDO", "CENARIO_ATIVO") and simulated_ts > 0
+    game_over = detect_tank_failure(sensors) if sensors else None
+    if running and game_over is not None:
+        await pause_engine("fim_de_jogo")
+        tick["status"] = "PAUSADO"
+        tick["paused_reason"] = "fim_de_jogo"
 
     await manager.broadcast({
         **tick,
@@ -159,6 +187,7 @@ async def display_tick() -> None:
         "alert_level": aggregate_alert_level(risks),
         "active_risks": _serialize_risks(risks),
         "active_predictions": _serialize_predictions(predictions),
+        "game_over": game_over if tick.get("paused_reason") == "fim_de_jogo" else None,
     })
 
 

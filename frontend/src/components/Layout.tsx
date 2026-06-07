@@ -2,6 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 
 import { useWebSocket } from "../hooks/useWebSocket";
 import type { LayoutContext, Tick } from "../types";
+import { GameOverOverlay } from "./GameOverOverlay";
 import { Header } from "./Header";
 
 const tabBase =
@@ -35,6 +36,13 @@ export function Layout() {
         </NavLink>
       </nav>
       <Outlet context={ctx} />
+
+      {data?.game_over && (
+        <GameOverOverlay
+          gameOver={data.game_over}
+          dia={Math.floor(data.simulated_hours / 24)}
+        />
+      )}
     </div>
   );
 }

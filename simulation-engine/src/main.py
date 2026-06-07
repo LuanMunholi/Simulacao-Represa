@@ -220,3 +220,14 @@ async def engine_start() -> dict[str, Any]:
         raise HTTPException(status_code=409, detail="startup já em execução")
     asyncio.create_task(run_startup_sequence(state))
     return {"ok": True}
+
+
+@app.post("/engine/reset")
+async def engine_reset() -> dict[str, Any]:
+    """Reinicia a simulação para uma nova partida: zera o estado (volta a pausada)
+    e gera uma nova série de chuva. Usado após fim de jogo (tanque esvaziou/transbordou)."""
+    state.reset()
+    state.rain_series = generate_rain_series()
+    state.rain_series_original = list(state.rain_series)
+    print("[engine] reset — nova partida (pausada)", flush=True)
+    return {"ok": True}

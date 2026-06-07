@@ -64,3 +64,35 @@ class EngineState:
         if self.scenario_active is not None:
             return "CENARIO_ATIVO"
         return "RODANDO"
+
+    def reset(self) -> None:
+        """Reinicia o estado para o início de uma nova partida (volta a pausada).
+
+        Mantém o objeto (mutação in-place) para que uma sequência de startup em
+        curso veja `paused=True` e aborte. A série de chuva é regerada pelo caller.
+        """
+        self.simulated_hours = 0
+        self.paused = True
+        self.paused_reason = "manual"
+        self.chuva_window.clear()
+        self.comporta_01 = 0.0
+        self.comporta_02 = 0.0
+        self.comporta_03 = 0.0
+        self.comporta_04 = 0.0
+        self.sensor_turbina_01 = "DESLIGADO"
+        self.sensor_chuva_01 = 0.0
+        self.sensor_chuva_02 = 0.0
+        self.sensor_enchimento_01 = 0.0
+        self.sensor_fluxo_01 = 0.0
+        self.sensor_fluxo_02 = 0.0
+        self.sensor_esvaziamento_01 = 0.0
+        self.sensor_energia_01 = 0.0
+        self.sensor_volume_01 = 0.0
+        self.sensor_volume_02 = 0.0
+        self.capacidade_atual = 0.0
+        self.contribuicao_chuva = 0.0
+        self.taxa_liquida_01 = 0.0
+        self.taxa_liquida_02 = 0.0
+        self.scenario_active = None
+        self.scenario_ticks_remaining = None
+        self.startup_active = False

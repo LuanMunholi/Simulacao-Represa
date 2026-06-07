@@ -58,12 +58,12 @@ export const SENSOR_CATEGORIES: SensorCategory[] = [
 // Acento visual por categoria (ponto colorido no título + barra lateral nos cards).
 // Tons escolhidos para não colidir com o vermelho/âmbar do sistema de perigo.
 export const ACCENT = {
-  water: { dot: "bg-sky-400", bar: "border-l-sky-500/70" },
-  rain: { dot: "bg-cyan-400", bar: "border-l-cyan-500/70" },
-  energy: { dot: "bg-emerald-400", bar: "border-l-emerald-500/70" },
-  gate: { dot: "bg-violet-400", bar: "border-l-violet-500/70" },
-  flow: { dot: "bg-teal-400", bar: "border-l-teal-500/70" },
-  stream: { dot: "bg-blue-400", bar: "border-l-blue-500/70" },
+  water: { dot: "bg-sky-400", bar: "border-l-sky-500/70", text: "text-sky-400" },
+  rain: { dot: "bg-cyan-400", bar: "border-l-cyan-500/70", text: "text-cyan-400" },
+  energy: { dot: "bg-emerald-400", bar: "border-l-emerald-500/70", text: "text-emerald-400" },
+  gate: { dot: "bg-violet-400", bar: "border-l-violet-500/70", text: "text-violet-400" },
+  flow: { dot: "bg-teal-400", bar: "border-l-teal-500/70", text: "text-teal-400" },
+  stream: { dot: "bg-blue-400", bar: "border-l-blue-500/70", text: "text-blue-400" },
 } as const;
 
 // Janela de chuva acumulada (dias) usada para derivar a média diária no card.

@@ -6,6 +6,7 @@ import { ComportaControlCard } from "../components/ComportaControlCard";
 import { DamSchematic } from "../components/DamSchematic";
 import { SensorCard, type SensorTone } from "../components/SensorCard";
 import { SeverityBadge } from "../components/SeverityBadge";
+import { useSensorTrails } from "../hooks/useSensorTrails";
 import { EnergyChart } from "../components/charts/EnergyChart";
 import { RainChart } from "../components/charts/RainChart";
 import { RiskCountChart } from "../components/charts/RiskCountChart";
@@ -53,6 +54,7 @@ function toneFor(id: string, valor: number | string): SensorTone {
 
 export function MonitoringPanel() {
   const { data } = useOutletContext<LayoutContext>();
+  const trails = useSensorTrails(data);
 
   return (
     <>
@@ -119,8 +121,9 @@ export function MonitoringPanel() {
                     key={id}
                     id={id}
                     entry={displayEntry(id, entry, data?.simulated_hours ?? 0)}
-                    accentBar={ACCENT[cat.accent].bar}
+                    accent={cat.accent}
                     tone={toneFor(id, entry.valor)}
+                    trail={trails[id]}
                   />
                 );
               })}

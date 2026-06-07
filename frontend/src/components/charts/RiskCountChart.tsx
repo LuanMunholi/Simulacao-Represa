@@ -10,18 +10,12 @@ import {
 } from "recharts";
 
 import { Card } from "../Card";
+import { CHART, ChartEmpty, axisProps, gridProps, tooltipStyle } from "./chartTheme";
 
 interface AlertCountPoint {
   simulated_timestamp: number;
   count: number;
 }
-
-const tooltipStyle: React.CSSProperties = {
-  background: "#0f172a",
-  border: "1px solid #334155",
-  color: "#e2e8f0",
-  fontSize: 12,
-};
 
 export function RiskCountChart() {
   const [items, setItems] = useState<AlertCountPoint[]>([]);
@@ -48,23 +42,19 @@ export function RiskCountChart() {
 
   return (
     <Card title="Atividade de alertas (novos por hora simulada)">
-      <ResponsiveContainer width="100%" height={220}>
-        <BarChart data={items} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-          <XAxis
-            dataKey="simulated_timestamp"
-            stroke="#94a3b8"
-            tick={{ fontSize: 11 }}
-          />
-          <YAxis
-            stroke="#94a3b8"
-            tick={{ fontSize: 11 }}
-            allowDecimals={false}
-          />
-          <Tooltip contentStyle={tooltipStyle} />
-          <Bar dataKey="count" fill="#ef4444" isAnimationActive={false} />
-        </BarChart>
-      </ResponsiveContainer>
+      {items.length === 0 ? (
+        <ChartEmpty />
+      ) : (
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={items} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+            <CartesianGrid {...gridProps} />
+            <XAxis dataKey="simulated_timestamp" {...axisProps} />
+            <YAxis {...axisProps} allowDecimals={false} />
+            <Tooltip contentStyle={tooltipStyle} />
+            <Bar dataKey="count" fill={CHART.danger} radius={[2, 2, 0, 0]} isAnimationActive={false} />
+          </BarChart>
+        </ResponsiveContainer>
+      )}
     </Card>
   );
 }

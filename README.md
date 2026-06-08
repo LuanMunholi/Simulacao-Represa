@@ -29,22 +29,9 @@ docker compose down           # para tudo
 docker compose down -v        # para tudo e apaga o volume do banco
 ```
 
-## Modo apresentação
-
-Cenário: um notebook hospeda a stack completa; outro computador (ex.: notebook ou
-PC do laboratório) acessa o painel pelo navegador, na mesma rede — incluindo o
-**hotspot de um celular**.
-
-Funciona **sem nenhuma mudança de código**: o front-end conversa com o backend pela
-mesma origem (caminhos relativos `/api` e `/ws`, proxiados pelo nginx do próprio
-container), então acessar por `http://<IP-do-servidor>:8080` é equivalente a
-`localhost`.
-
 ### Passo a passo
 
-1. Conecte **os dois computadores** à mesma rede (hotspot do celular, de preferência —
-   evita o isolamento de cliente comum em Wi-Fi de universidade). Não precisa de
-   internet/dados móveis: o hotspot já cria a rede local.
+1. Conecte **os dois computadores** à mesma rede.
    
 2. No **notebook-servidor**, rode (de preferência em PowerShell **como Administrador**,
    para a regra de firewall ser criada automaticamente):
@@ -57,16 +44,3 @@ container), então acessar por `http://<IP-do-servidor>:8080` é equivalente a
    Use `-Build` após mudanças no código; `-NoStart` para só configurar/mostrar a URL.
    
 3. No **outro computador**, abra a URL mostrada (ex.: `http://192.168.43.5:8080`).
-
-### Configuração manual (equivalente ao script)
-
-```powershell
-# 1. Liberar a porta no firewall (PowerShell como Administrador, uma vez)
-New-NetFirewallRule -DisplayName "Simulacao-Represa 8080" -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow
-
-# 2. Descobrir o IP do notebook-servidor na rede ativa
-ipconfig   # use o IPv4 do adaptador conectado ao hotspot
-
-# 3. Subir a stack
-docker compose up -d
-```

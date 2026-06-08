@@ -56,6 +56,10 @@ class EngineState:
     # Sequência de startup em execução
     startup_active: bool = False
 
+    # Controle manual assumido pelo operador (via /engine/adjust). Uma vez ligado,
+    # a sequência de startup para de mexer nas comportas — quem comanda é o usuário.
+    manual_override: bool = False
+
     def status(self) -> str:
         if self.paused:
             return "PAUSADO"
@@ -64,6 +68,27 @@ class EngineState:
         if self.scenario_active is not None:
             return "CENARIO_ATIVO"
         return "RODANDO"
+
+    def seed_chuva_window(self) -> None:
+        """Pré-carrega a janela de chuva (30 dias) com o mês anterior (cíclico)
+        da série de chuva.
+
+        Sem isso, uma partida nova começa com a janela vazia → `sensor_chuva_02`
+        (chuva acumulada) ≈ 0 → `capacidade_atual` trava no piso (10 m³/h) e o
+        tanque superior enche lentíssimo, mesmo com a comporta 100% aberta, até a
+        chuva acumular. Semeando com o mês anterior, a barragem parte como se já
+        tivesse histórico, e a capacidade reflete a chuva real desde o início.
+        """
+        self.chuva_window.clear()
+        if not self.rain_series:
+            return
+        n_dias = CHUVA_WINDOW_SIZE // 24
+        total_dias = len(self.rain_series)
+        for offset in range(n_dias, 0, -1):  # dias -30..-1 (ordem cronológica)
+            valor = self.rain_series[(-offset) % total_dias]
+            for _ in range(24):
+                self.chuva_window.append(valor)
+        self.sensor_chuva_02 = sum(self.chuva_window)
 
     def reset(self) -> None:
         """Reinicia o estado para o início de uma nova partida (volta a pausada).
@@ -96,3 +121,4 @@ class EngineState:
         self.scenario_active = None
         self.scenario_ticks_remaining = None
         self.startup_active = False
+        self.manual_override = False

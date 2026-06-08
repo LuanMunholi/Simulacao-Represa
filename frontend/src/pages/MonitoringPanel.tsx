@@ -20,17 +20,11 @@ import {
 import type { LayoutContext, SensorEntry } from "../types";
 
 // O engine expõe sensor_chuva_02 como total de mm acumulado na janela de 30 dias.
-// O card deve mostrar a média diária, sem alterar a física do engine. Enquanto a
-// janela não enche, divide-se pelos dias já decorridos (o dia em curso conta como 1),
-// limitado a 30 — assim que a janela enche, o divisor fixa em 30.
-function displayEntry(
-  id: string,
-  entry: SensorEntry,
-  simulatedHours: number,
-): SensorEntry {
+// O card mostra a média diária. A janela já parte cheia (semeada com o mês anterior
+// no boot/reset), então o divisor é sempre 30 dias.
+function displayEntry(id: string, entry: SensorEntry): SensorEntry {
   if (id === "sensor_chuva_02" && typeof entry.valor === "number") {
-    const dias = Math.min(CHUVA_WINDOW_DAYS, Math.floor(simulatedHours / 24) + 1);
-    return { valor: entry.valor / dias, unidade: "mm/dia" };
+    return { valor: entry.valor / CHUVA_WINDOW_DAYS, unidade: "mm/dia" };
   }
   return entry;
 }
@@ -128,7 +122,7 @@ export function MonitoringPanel() {
                   <SensorCard
                     key={id}
                     id={id}
-                    entry={displayEntry(id, entry, data?.simulated_hours ?? 0)}
+                    entry={displayEntry(id, entry)}
                     accent={cat.accent}
                     tone={toneFor(id, entry.valor)}
                     trail={trails[id]}

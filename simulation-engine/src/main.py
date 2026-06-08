@@ -100,6 +100,7 @@ async def lifespan(app: FastAPI):
     global http_client, scheduler
     state.rain_series = generate_rain_series()
     state.rain_series_original = list(state.rain_series)
+    state.seed_chuva_window()
     http_client = httpx.AsyncClient()
     scheduler = AsyncIOScheduler()
     interval = 1.0 / state.fator_aceleracao
@@ -194,6 +195,9 @@ async def engine_adjust(body: AdjustBody) -> dict[str, Any]:
     state.comporta_03 = body.comporta_03
     state.comporta_04 = body.comporta_04
     state.sensor_turbina_01 = body.turbina
+    # O operador assumiu o controle: a sequência de startup (se ainda em curso)
+    # para de sobrescrever as comportas a partir daqui.
+    state.manual_override = True
     return {"ok": True}
 
 
@@ -229,5 +233,6 @@ async def engine_reset() -> dict[str, Any]:
     state.reset()
     state.rain_series = generate_rain_series()
     state.rain_series_original = list(state.rain_series)
+    state.seed_chuva_window()
     print("[engine] reset — nova partida (pausada)", flush=True)
     return {"ok": True}

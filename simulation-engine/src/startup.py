@@ -17,6 +17,9 @@ async def run_startup_sequence(state: EngineState) -> None:
     if state.startup_active:
         return
     state.startup_active = True
+    # Início de uma nova sequência: o controle ainda é automático até o usuário
+    # mexer nas comportas (que liga manual_override e interrompe o startup).
+    state.manual_override = False
     # A simulação inicia pausada; "Iniciar Barragem" retoma o loop para que os
     # sensores voltem a ser calculados e os tanques possam encher.
     state.paused = False
@@ -26,12 +29,15 @@ async def run_startup_sequence(state: EngineState) -> None:
         state.comporta_01 = 100.0
         print("[engine] startup: stage 1 — comporta_01=100, enchendo tanque superior", flush=True)
         while state.sensor_volume_01 < 90.0:
-            if state.paused:
-                print("[engine] startup abortado (pausado)", flush=True)
+            if state.paused or state.manual_override:
+                print("[engine] startup interrompido (pausado/controle manual)", flush=True)
                 return
             await asyncio.sleep(0.1)
 
         # Estágio 2: abrir comportas 02/03, ligar turbina, encher tanque inferior
+        if state.manual_override:
+            print("[engine] startup interrompido (controle manual)", flush=True)
+            return
         state.comporta_02 = 100.0
         state.comporta_03 = 100.0
         state.sensor_turbina_01 = "LIGADO"
@@ -41,14 +47,17 @@ async def run_startup_sequence(state: EngineState) -> None:
             flush=True,
         )
         while state.sensor_volume_02 < 90.0:
-            if state.paused:
-                print("[engine] startup abortado (pausado)", flush=True)
+            if state.paused or state.manual_override:
+                print("[engine] startup interrompido (pausado/controle manual)", flush=True)
                 return
             await asyncio.sleep(0.1)
 
         # Estágio 3: regime de operação — 50% nas 4 comportas mantém um equilíbrio aproximado
         # (com c01=c02=50 e capacidade_atual ~variando, vol_01 estabiliza próximo de 90 sob chuva
         # média; o usuário pode acionar /simulation/adjust para refinar a qualquer momento).
+        if state.manual_override:
+            print("[engine] startup interrompido (controle manual)", flush=True)
+            return
         state.comporta_01 = 50.0
         state.comporta_02 = 50.0
         state.comporta_03 = 50.0

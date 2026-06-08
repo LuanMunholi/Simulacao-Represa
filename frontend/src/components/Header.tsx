@@ -3,9 +3,9 @@ import type { Tick } from "../types";
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <span className="flex items-baseline gap-1.5 text-xs px-2.5 py-1 rounded-md bg-slate-800/60 border border-slate-700/60">
-      <span className="text-slate-500 uppercase tracking-wide text-[10px]">{label}</span>
-      <span className="font-mono font-semibold text-slate-200">{value}</span>
+    <span className="flex items-baseline gap-2 px-3 py-1.5 rounded-md bg-slate-800/60 border border-slate-700/60">
+      <span className="text-slate-500 uppercase tracking-wide text-xs">{label}</span>
+      <span className="font-mono font-semibold text-base text-slate-200">{value}</span>
     </span>
   );
 }
@@ -24,8 +24,8 @@ export function Header({ data, connected }: { data: Tick | null; connected: bool
           </svg>
         </div>
         <div>
-          <h1 className="text-lg font-semibold m-0 leading-tight">Simulação Represa</h1>
-          <div className="text-xs text-slate-400 font-mono">
+          <h1 className="text-xl font-semibold m-0 leading-tight">Simulação Represa</h1>
+          <div className="text-sm text-slate-400 font-mono">
             {data ? data.simulated_time : "Aguardando dados…"}
           </div>
         </div>
@@ -38,15 +38,15 @@ export function Header({ data, connected }: { data: Tick | null; connected: bool
           value={data ? `${data.fator_aceleracao.toFixed(1)}x` : "—"}
         />
 
-        <span className="flex items-center gap-1.5 text-xs text-slate-400">
+        <span className="flex items-center gap-1.5 text-sm text-slate-400">
           <span
-            className={`w-2 h-2 rounded-full ${connected ? "bg-emerald-400" : "bg-red-500"}`}
+            className={`w-2.5 h-2.5 rounded-full ${connected ? "bg-emerald-400" : "bg-red-500"}`}
           />
           {connected ? "Conectado" : "Desconectado"}
         </span>
 
         <span
-          className={`text-xs px-2.5 py-1 rounded-md font-medium border ${
+          className={`text-sm px-3 py-1.5 rounded-md font-medium border ${
             isPaused
               ? "bg-red-500/15 text-red-300 border-red-500/30"
               : "bg-slate-700/50 text-slate-300 border-slate-600/50"
@@ -57,11 +57,11 @@ export function Header({ data, connected }: { data: Tick | null; connected: bool
         </span>
 
         <span
-          className={`flex items-center gap-2 text-sm px-3 py-1.5 rounded-md font-semibold bg-slate-800/80 border border-slate-700 ring-1 ${
+          className={`flex items-center gap-2 text-base px-3.5 py-2 rounded-md font-semibold bg-slate-800/80 border border-slate-700 ring-1 ${
             health?.ring ?? "ring-slate-600/40"
           } ${health?.text ?? "text-slate-300"}`}
         >
-          <span className={`w-2.5 h-2.5 rounded-full ${health?.dot ?? "bg-slate-500"}`} />
+          <span className={`w-3 h-3 rounded-full ${health?.dot ?? "bg-slate-500"}`} />
           {health?.label ?? "—"}
         </span>
       </div>

@@ -51,14 +51,29 @@ def _serialize_risks(risks) -> list[dict[str, Any]]:
     ]
 
 
-def detect_tank_failure(sensors: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
+def detect_tank_failure(
+    sensors: dict[str, dict[str, Any]],
+    derived: dict[str, float] | None = None,
+    allow_empty: bool = True,
+) -> dict[str, Any] | None:
     """Fim de jogo: um tanque esvaziou (≤0%) ou transbordou (≥100%).
 
     Retorna detalhes para o frontend exibir o aviso de reinício, ou None se OK.
+
+    A falha exige que o tanque esteja no limite **e ainda evoluindo nessa direção**
+    (taxa líquida no sinal correspondente):
+      - transbordo: volume ≥ 100% e taxa_líquida > 0 (entrando mais do que sai);
+      - esvaziamento: volume ≤ 0% e taxa_líquida < 0 (saindo mais do que entra).
+    Assim um tanque parado em 0% (ou 100%) com as comportas fechadas — taxa
+    líquida nula — NÃO é derrota: ele só está estável, não falhando.
+
+    `allow_empty=False` ignora o esvaziamento: durante a sequência de startup o
+    tanque inferior parte legitimamente de 0% antes de ser enchido.
     """
-    for sid, nome in (
-        ("sensor_volume_01", "Tanque Superior"),
-        ("sensor_volume_02", "Tanque Inferior"),
+    derived = derived or {}
+    for sid, nome, taxa_field in (
+        ("sensor_volume_01", "Tanque Superior", "taxa_liquida_01"),
+        ("sensor_volume_02", "Tanque Inferior", "taxa_liquida_02"),
     ):
         entry = sensors.get(sid)
         if entry is None:
@@ -66,9 +81,10 @@ def detect_tank_failure(sensors: dict[str, dict[str, Any]]) -> dict[str, Any] | 
         vol = entry.get("valor")
         if not isinstance(vol, (int, float)):
             continue
-        if vol >= 100:
+        taxa = derived.get(taxa_field, 0.0)
+        if vol >= 100 and taxa > 0:
             return {"tanque": nome, "sensor": sid, "tipo": "transbordou"}
-        if vol <= 0:
+        if allow_empty and vol <= 0 and taxa < 0:
             return {"tanque": nome, "sensor": sid, "tipo": "esvaziou"}
     return None
 
@@ -94,7 +110,7 @@ def build_broadcast(tick: dict[str, Any]) -> dict[str, Any]:
     time_alert = format_alert(simulated_ts)
     risks = evaluate_risks(sensors, derived, time_alert) if sensors else []
     predictions = compute_predictions(sensors, derived, time_alert) if sensors else []
-    game_over = detect_tank_failure(sensors) if tick.get("paused_reason") == "fim_de_jogo" else None
+    game_over = detect_tank_failure(sensors, derived) if tick.get("paused_reason") == "fim_de_jogo" else None
     return {
         **tick,
         "simulated_time": format_display(simulated_ts),
@@ -172,14 +188,30 @@ async def display_tick() -> None:
 
     # Fim de jogo: tanque esvaziou (≤0%) ou transbordou (≥100%) durante operação.
     # Não pausamos mais por previsão crítica — apenas neste caso real de falha.
-    # Exige simulated_hours > 0 para não confundir o estado inicial (tanques em 0%
-    # antes do enchimento) com uma falha real.
-    running = tick.get("status") in ("RODANDO", "CENARIO_ATIVO") and simulated_ts > 0
-    game_over = detect_tank_failure(sensors) if sensors else None
-    if running and game_over is not None:
-        await pause_engine("fim_de_jogo")
-        tick["status"] = "PAUSADO"
-        tick["paused_reason"] = "fim_de_jogo"
+    #   - O transbordo (≥100%) é falha em qualquer fase ativa, INCLUSIVE durante
+    #     o startup (INICIANDO): encher além do limite é sempre uma falha física.
+    #   - O esvaziamento (≤0%) só conta fora do startup, pois o tanque inferior
+    #     parte legitimamente de 0% enquanto está sendo enchido.
+    # Exige simulated_hours > 0 para não confundir o tick inicial (tanques ~0%)
+    # com uma falha real.
+    status = tick.get("status")
+    active = status in ("RODANDO", "CENARIO_ATIVO", "INICIANDO") and simulated_ts > 0
+    allow_empty = status in ("RODANDO", "CENARIO_ATIVO")
+    if active and sensors:
+        falha = detect_tank_failure(sensors, derived, allow_empty=allow_empty)
+        if falha is not None:
+            await pause_engine("fim_de_jogo")
+            tick["status"] = "PAUSADO"
+            tick["paused_reason"] = "fim_de_jogo"
+
+    # Para o broadcast: reporta a falha enquanto a partida estiver terminada
+    # (paused_reason == "fim_de_jogo"), mesmo nos ticks de heartbeat seguintes —
+    # assim o overlay de fim de jogo persiste até o usuário reiniciar.
+    game_over = (
+        detect_tank_failure(sensors, derived)
+        if sensors and tick.get("paused_reason") == "fim_de_jogo"
+        else None
+    )
 
     await manager.broadcast({
         **tick,
@@ -187,7 +219,7 @@ async def display_tick() -> None:
         "alert_level": aggregate_alert_level(risks),
         "active_risks": _serialize_risks(risks),
         "active_predictions": _serialize_predictions(predictions),
-        "game_over": game_over if tick.get("paused_reason") == "fim_de_jogo" else None,
+        "game_over": game_over,
     })
 
 

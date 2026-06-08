@@ -1,0 +1,143 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+
+  /* Paleta semântica — linguagem de design "sala de controle" */
+  --color-brand: #38bdf8; /* água / acento principal */
+  --color-water: #38bdf8;
+  --color-energy: #22c55e;
+  --color-ok: #10b981;
+  --color-warn: #f59e0b;
+  --color-alert: #f97316;
+  --color-danger: #ef4444;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  /* Fundo escuro com leve profundidade radial (sutil, tipo painel industrial) */
+  background-color: var(--color-slate-900);
+  background-image:
+    radial-gradient(1100px 600px at 85% -12%, rgba(56, 189, 248, 0.06), transparent 60%),
+    radial-gradient(900px 500px at -5% 0%, rgba(99, 102, 241, 0.05), transparent 55%);
+  background-attachment: fixed;
+  color: var(--color-slate-200);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+}
+
+/* Sliders alinhados ao acento de água */
+input[type="range"] {
+  accent-color: var(--color-sky-500);
+}
+
+/* ---- Esquema da represa (DamSchematic) ---- */
+
+/* Nível de água sobe/desce suavemente quando os volumes mudam */
+.dam-water {
+  transition: y 0.5s ease, height 0.5s ease, fill 0.4s ease;
+}
+
+/* Turbina gira quando ligada */
+@keyframes dam-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.dam-blades {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.dam-blades.on {
+  animation: dam-spin 1.6s linear infinite;
+}
+
+/* Chuva caindo */
+@keyframes dam-rain-fall {
+  0% {
+    transform: translateY(-4px);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.75;
+  }
+  100% {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+.dam-rain {
+  transform-box: fill-box;
+  animation: dam-rain-fall 1.1s linear infinite;
+}
+
+/* Fluxo de água nos tubos (traço deslizante) */
+@keyframes dam-flow-dash {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+.dam-flow {
+  animation: dam-flow-dash 0.9s linear infinite;
+}
+
+/* Fluxo nos tubos grossos do esquema horizontal (dasharray 14 14) */
+@keyframes dam-flow-move {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+.dam-flow-lg {
+  animation: dam-flow-move 0.7s linear infinite;
+}
+
+/* Comporta vertical: preenchimento cresce da base; anima y e altura */
+.dam-gate {
+  transition: y 0.4s ease, height 0.4s ease, fill 0.3s ease;
+}
+
+/* Alerta crítico piscando em vermelho (chama atenção sem pausar a simulação) */
+@keyframes alert-blink {
+  0%,
+  100% {
+    background-color: rgb(127 29 29 / 0.55); /* red-900 */
+    border-color: rgb(239 68 68 / 0.9); /* red-500 */
+    box-shadow: 0 0 0 0 rgb(239 68 68 / 0);
+  }
+  50% {
+    background-color: rgb(153 27 27 / 0.85); /* red-800 */
+    border-color: rgb(248 113 113 / 1); /* red-400 */
+    box-shadow: 0 0 14px 1px rgb(239 68 68 / 0.55);
+  }
+}
+.alert-blink {
+  animation: alert-blink 1s ease-in-out infinite;
+}
+
+/* Setas de entrada/saída marchando */
+@keyframes dam-march {
+  0%,
+  100% {
+    transform: translateX(-3px);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translateX(3px);
+    opacity: 1;
+  }
+}
+.dam-march {
+  transform-box: fill-box;
+  animation: dam-march 0.9s ease-in-out infinite;
+}

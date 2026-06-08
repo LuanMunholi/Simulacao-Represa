@@ -113,7 +113,7 @@ Este documento define o contrato completo de comunicação entre os serviços. �
 
 ```
 "previsao_critica"   # pausa automática por previsão < 24h
-"manual"             # pausa solicitada pelo usuário (reservado para uso futuro)
+"manual"             # pausa solicitada pelo usuário via POST /simulation/pause
 ```
 
 ---
@@ -232,7 +232,7 @@ O frontend deve consumir este payload via `WebSocket.onmessage` e atualizar o es
 {
   "codigo":     "RISCO_01",
   "severidade": "ALTA",
-  "mensagem":   "24 de Janeiro de 2024, às 18:00 - Risco de Transbordamento...",
+  "mensagem":   "24 de Janeiro de 2026, às 18:00 - Risco de Transbordamento...",
   "sensores": {
     "sensor_volume_01":     92.0,
     "sensor_chuva_01":      15.3,
@@ -252,7 +252,7 @@ O frontend deve consumir este payload via `WebSocket.onmessage` e atualizar o es
   "tipo":        "overflow",
   "tempo_horas": 36.5,
   "severidade":  "ALERTA",
-  "mensagem":    "24 de Janeiro de 2024, às 18:00 - ALERTA: Previsão de transbordamento..."
+  "mensagem":    "24 de Janeiro de 2026, às 18:00 - ALERTA: Previsão de transbordamento..."
 }
 ```
 
@@ -269,7 +269,7 @@ O frontend deve consumir este payload via `WebSocket.onmessage` e atualizar o es
 ```json
 {
   "simulated_hours": 42,
-  "simulated_time": "Dia 2, Mês 1 de 2024, às 18:00",
+  "simulated_time": "Dia 2, Mês 1 de 2026, às 18:00",
   "fator_aceleracao": 10.0,
   "status": "RODANDO",
   "paused_reason": null,
@@ -302,7 +302,7 @@ O frontend deve consumir este payload via `WebSocket.onmessage` e atualizar o es
     {
       "codigo": "RISCO_06",
       "severidade": "MEDIA",
-      "mensagem": "2 de Janeiro de 2024, às 18:00 - Comportas do interior da barragem em estados de abertura diferentes. O estado ideal é que ambas estejam no mesmo percentual.",
+      "mensagem": "2 de Janeiro de 2026, às 18:00 - Comportas do interior da barragem em estados de abertura diferentes. O estado ideal é que ambas estejam no mesmo percentual.",
       "sensores": {
         "sensor_comporta_02": 40.0,
         "sensor_comporta_03": 60.0
@@ -331,9 +331,17 @@ Dispara a sequência de startup da barragem (assíncrona — retorna imediatamen
 
 ### `POST /engine/pause`
 
-Suspende o loop de simulação. O engine para de avançar ticks mas permanece em execução.
+Suspende o loop de simulação. O engine para de avançar ticks mas permanece em execução. O motivo é registrado em `state.paused_reason` e propagado no campo `paused_reason` dos próximos payloads de tick e broadcast.
 
-**Body:** nenhum  
+**Body:**
+```json
+{ "reason": "manual" }
+```
+
+| Campo | Tipo | Valores |
+|---|---|---|
+| `reason` | `PausedReason` | `"previsao_critica"` \| `"manual"` |
+
 **Response:** `{"ok": true}`
 
 ---
@@ -384,7 +392,7 @@ Inicia um cenário de chuva intensa ou seca sobrescrevendo a série de chuva.
 
 ### `POST /engine/adjust`
 
-Aplica novos valores de comportas calculados pelo algoritmo de ajuste do backend.
+Aplica novos valores de comportas e estado da turbina calculados pelo algoritmo de ajuste do backend. A turbina é controlada de forma independente das comportas (ver Specs Seção 4), portanto faz parte do payload.
 
 **Body:**
 ```json
@@ -392,7 +400,8 @@ Aplica novos valores de comportas calculados pelo algoritmo de ajuste do backend
   "comporta_01": 50.0,
   "comporta_02": 60.0,
   "comporta_03": 60.0,
-  "comporta_04": 40.0
+  "comporta_04": 40.0,
+  "turbina": "LIGADO"
 }
 ```
 
@@ -402,6 +411,7 @@ Aplica novos valores de comportas calculados pelo algoritmo de ajuste do backend
 | `comporta_02` | `float` | 0.0 ≤ valor ≤ `comporta_03` |
 | `comporta_03` | `float` | 0.0 ≤ valor ≤ 100.0 |
 | `comporta_04` | `float` | 0.0 ≤ valor ≤ 100.0 |
+| `turbina` | `TurbineState` | `"LIGADO"` \| `"DESLIGADO"` |
 
 **Response:** `{"ok": true}`
 
@@ -417,7 +427,7 @@ Retorna o estado atual da simulação e as leituras mais recentes dos sensores (
 ```json
 {
   "simulated_hours": 42,
-  "simulated_time": "Dia 2, Mês 1 de 2024, às 18:00",
+  "simulated_time": "Dia 2, Mês 1 de 2026, às 18:00",
   "fator_aceleracao": 10.0,
   "status": "RODANDO",
   "paused_reason": null,
@@ -439,6 +449,34 @@ Aciona a sequência de startup da barragem via engine.
 
 **Body:** nenhum  
 **Response `202 Accepted`:** `{"ok": true}`
+
+---
+
+### `POST /simulation/pause`
+
+Pausa o loop de simulação a pedido do usuário. Chama internamente `POST /engine/pause` com `reason = "manual"`. Idempotente — se a simulação já estiver pausada por qualquer motivo, o endpoint apenas confirma o estado atual; o `paused_reason` original é preservado (uma pausa por previsão crítica não é sobrescrita por uma pausa manual).
+
+**Body:** nenhum  
+**Response `200 OK`:**
+```json
+{ "ok": true, "paused_reason": "manual" }
+```
+
+O campo `paused_reason` da resposta reflete o motivo da pausa em vigor após a chamada (`"manual"` no caso comum, `"previsao_critica"` se já estava pausada por previsão).
+
+---
+
+### `POST /simulation/resume`
+
+Retoma o loop de simulação após pausa manual. Chama internamente `POST /engine/resume`. **Não retoma** uma pausa por previsão crítica — nesse caso o usuário deve acionar `POST /simulation/adjust`, que calcula e aplica as correções antes de retomar.
+
+**Body:** nenhum  
+**Response `200 OK`:** `{"ok": true}` — quando `paused_reason = "manual"` ou simulação não está pausada (idempotente)  
+**Response `409 Conflict`:**
+```json
+{ "detail": "Simulação pausada por previsão crítica — use /simulation/adjust" }
+```
+quando `paused_reason = "previsao_critica"`.
 
 ---
 
@@ -482,7 +520,8 @@ Aciona o ajuste automático de comportas. O backend calcula os valores ideais e 
     "comporta_01": 50.0,
     "comporta_02": 60.0,
     "comporta_03": 60.0,
-    "comporta_04": 40.0
+    "comporta_04": 40.0,
+    "turbina": "LIGADO"
   }
 }
 ```
@@ -509,10 +548,10 @@ Retorna o histórico de alertas paginado, ordenado por `simulated_timestamp DESC
     {
       "id": 142,
       "simulated_timestamp": 42,
-      "simulated_time": "Dia 2, Mês 1 de 2024, às 18:00",
+      "simulated_time": "Dia 2, Mês 1 de 2026, às 18:00",
       "tipo": "risco",
       "severidade": "ALTA",
-      "mensagem": "2 de Janeiro de 2024, às 18:00 - Risco de Transbordamento...",
+      "mensagem": "2 de Janeiro de 2026, às 18:00 - Risco de Transbordamento...",
       "leituras": {
         "sensor_volume_01": 92.0,
         "sensor_enchimento_01": 135.0,

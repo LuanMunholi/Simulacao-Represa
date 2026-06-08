@@ -42,7 +42,7 @@
 
 - [ ] **2.3** Criar `backend-api/src/models.py` com modelo `SimulationState`: colunas `id` (PK), `simulated_hours` (int), `fator_aceleracao` (float), `paused` (bool), `rain_series` (JSON), `created_at`, `updated_at`
 - [ ] **2.4** Adicionar modelo `SensorReading`: colunas `id` (PK), `simulated_timestamp` (int, horas), `sensor_id` (str), `valor` (float), `unidade` (str)
-- [ ] **2.5** Adicionar modelo `AlertHistory`: colunas `id` (PK), `simulated_timestamp` (int), `tipo` (str: `risco` | `previsão`), `severidade` (str), `mensagem` (str), `leituras` (JSON)
+- [ ] **2.5** Adicionar modelo `AlertHistory`: colunas `id` (PK), `simulated_timestamp` (int), `tipo` (str: `risco` | `previsao`, sem diacríticos para alinhar com o enum do API-Contract), `severidade` (str), `mensagem` (str), `leituras` (JSON)
 
 ### 2c — Migration e índices
 
@@ -57,7 +57,7 @@
 ### 3a — Estrutura base e estado interno
 
 - [ ] **3.1** Criar `simulation-engine/requirements.txt` com: `apscheduler`, `httpx`, `fastapi`, `uvicorn`, `pydantic`
-- [ ] **3.2** Criar `simulation-engine/src/state.py`: classe `EngineState` com todos os campos de estado — `simulated_hours`, `fator_aceleracao`, `paused`, `rain_series` (lista de 364 floats), `rain_index` (int), `comporta_01..04` (float, %), `sensor_chuva_01`, `sensor_chuva_02`, `chuva_window` (deque maxlen=720), `capacidade_atual`, `sensor_enchimento_01`, `sensor_fluxo_01`, `sensor_fluxo_02`, `sensor_esvaziamento_01`, `sensor_turbina_01`, `sensor_energia_01`, `sensor_volume_01`, `sensor_volume_02`
+- [ ] **3.2** Criar `simulation-engine/src/state.py`: classe `EngineState` com todos os campos de estado — `simulated_hours` (int), `fator_aceleracao` (float), `paused` (bool), `paused_reason` (str | None: `"manual"` | `"previsao_critica"`), `rain_series` (lista de 364 floats — uma entrada por dia), `rain_series_original` (lista de 364 floats — backup para restauração após cenários), `comporta_01..04` (float, %), `sensor_turbina_01` (str: `"LIGADO"` | `"DESLIGADO"`, controlado externamente — não derivado), `sensor_chuva_01`, `sensor_chuva_02`, `chuva_window` (deque maxlen=720), `capacidade_atual`, `sensor_enchimento_01`, `sensor_fluxo_01`, `sensor_fluxo_02`, `sensor_esvaziamento_01`, `sensor_energia_01`, `sensor_volume_01`, `sensor_volume_02`. Observação: o índice do dia da série de chuva é derivado de `simulated_hours // 24`, não armazenado em campo próprio.
 - [ ] **3.3** Criar `simulation-engine/src/config.py`: URL do backend-api, porta do engine, valor padrão de `fator_aceleracao` (1.0)
 
 ### 3b — Geração de série de chuva
@@ -73,34 +73,34 @@
 ### 3c — Pipeline de sensores
 
 - [ ] **3.6** Criar `simulation-engine/src/sensors.py`: função `compute_tick(state: EngineState) -> EngineState` que executa o pipeline completo na ordem de dependência:
-  1. `sensor_chuva_01 = rain_series[rain_index % 364]`; `rain_index += 1`
+  1. `dia_atual = state.simulated_hours // 24`; `sensor_chuva_01 = rain_series[dia_atual % 364]` — indexação **por dia simulado** (não por tick). `simulated_hours` é lido antes do incremento (feito por `simulation_tick` após `compute_tick`), portanto: ticks 0–23 leem `rain_series[0]`, ticks 24–47 leem `rain_series[1]`, etc. A série tem 364 entradas diárias e cicla a cada ano simulado.
   2. Adicionar `sensor_chuva_01 × 1h` à `chuva_window`; `sensor_chuva_02 = sum(chuva_window)`
   3. `capacidade_atual = min(200, max(10, (sensor_chuva_02 / 10) × 200))`
   4. `sensor_enchimento_01 = (comporta_01 / 100) × capacidade_atual`
   5. `sensor_fluxo_01 = (comporta_02 / 100) × 200`
   6. `sensor_fluxo_02 = min((comporta_03 / 100) × 200, sensor_fluxo_01)`
   7. `sensor_esvaziamento_01 = (comporta_04 / 100) × 200`
-  8. `sensor_turbina_01 = "LIGADO" if sensor_comporta_02 > 0 and sensor_comporta_03 > 0 else "DESLIGADO"`; `sensor_energia_01 = sensor_fluxo_01 × 50 if sensor_turbina_01 == "LIGADO" else 0`
+  8. `sensor_energia_01 = sensor_fluxo_01 × 50 if state.sensor_turbina_01 == "LIGADO" else 0` — o estado da turbina é **controlado externamente** (startup, `/engine/adjust`, ou algoritmo de ajuste do backend). `compute_tick` **não** modifica `state.sensor_turbina_01` — apenas lê o valor atual para calcular a energia.
   9. `contribuicao_chuva = sensor_chuva_01`; `taxa_liquida_v1 = sensor_enchimento_01 + contribuicao_chuva − sensor_fluxo_01`; `delta_v1 = taxa_liquida_v1 × 1`; `sensor_volume_01 = clamp(sensor_volume_01 + delta_v1 / 100, 0, 100)`
   10. `taxa_liquida_v2 = sensor_fluxo_02 + contribuicao_chuva − sensor_esvaziamento_01`; `delta_v2 = taxa_liquida_v2 × 1`; `sensor_volume_02 = clamp(sensor_volume_02 + delta_v2 / 100, 0, 100)`
-- [ ] **3.7** Escrever testes unitários para `compute_tick`: (a) com comportas todas em 0% — volumes não mudam; (b) com enchimento > fluxo — volume_01 sobe; (c) volume em 100% com entrada positiva — permanece em 100% (clamp)
+- [ ] **3.7** Escrever testes unitários para `compute_tick`: (a) com comportas todas em 0% — volumes não mudam; (b) com enchimento > fluxo — volume_01 sobe; (c) volume em 100% com entrada positiva — permanece em 100% (clamp); (d) `state.sensor_turbina_01` **não é modificado** por `compute_tick` (com qualquer combinação de comportas); (e) `sensor_energia_01` reflete o estado externo da turbina — 0 quando `sensor_turbina_01 = "DESLIGADO"`, `fluxo_01 × 50` quando `"LIGADO"`; (f) indexação da chuva por dia — em 25 ticks consecutivos sem mudança de série, `sensor_chuva_01` muda exatamente uma vez (do dia 0 para o dia 1 ao chegar em `simulated_hours = 24`)
 
 ### 3d — Startup e cenários
 
 - [ ] **3.8** Criar `simulation-engine/src/startup.py`: função assíncrona `run_startup_sequence(state)` que executa a sequência da Seção 9:
   - Abrir `comporta_01` progressivamente até `sensor_volume_01 ≥ 90%`
-  - Abrir `comporta_02` e `comporta_03` progressivamente até `sensor_volume_02 ≥ 90%`
-  - Ajustar comportas para manter ~90% em ambos
-- [ ] **3.9** Criar `simulation-engine/src/scenarios.py`: função `apply_scenario(state, tipo: str, duracao_dias: int)` que sobrescreve a `rain_series` nos próximos `duracao_dias × 24` ticks — chuva intensa: 20 mm/h fixo; seca: 0 mm/h fixo; restaura série original após o período
+  - Abrir `comporta_02` e `comporta_03` progressivamente **e** setar `state.sensor_turbina_01 = "LIGADO"` simultaneamente; aguardar `sensor_volume_02 ≥ 90%`
+  - Ajustar comportas para manter ~90% em ambos; preservar `sensor_turbina_01 = "LIGADO"` enquanto `comporta_02 > 0` e `comporta_03 > 0` (caso o ajuste feche alguma dessas comportas, setar `sensor_turbina_01 = "DESLIGADO"` para manter o invariante operacional)
+- [ ] **3.9** Criar `simulation-engine/src/scenarios.py`: função `apply_scenario(state, tipo: str, duracao_dias: int)` que sobrescreve **as próximas `duracao_dias` entradas diárias** da `rain_series` (começando pelo dia atual `state.simulated_hours // 24`) — chuva intensa: 20 mm/h fixo em cada entrada; seca: 0 mm/h fixo em cada entrada. Antes de sobrescrever, copiar os valores originais para `state.rain_series_original` (ou estrutura equivalente); ao fim do período (controlado via `scenario_active`/`scenario_ticks_remaining` no estado), restaurar as entradas originais. A indexação continua sendo por dia (ver tarefa 3.6 passo 1), portanto a sobrescrita afeta naturalmente todos os ticks daquele dia simulado.
 
 ### 3e — API HTTP do engine (comandos vindos do backend)
 
 - [ ] **3.10** Criar `simulation-engine/src/api.py`: aplicação FastAPI com os endpoints:
-  - `POST /engine/pause` — seta `state.paused = True`
-  - `POST /engine/resume` — seta `state.paused = False`
+  - `POST /engine/pause` body `{"reason": "manual" | "previsao_critica"}` — seta `state.paused = True` e `state.paused_reason = reason`; idempotente quando já pausado (preserva o `paused_reason` anterior)
+  - `POST /engine/resume` — seta `state.paused = False` e `state.paused_reason = None`
   - `POST /engine/speed` body `{"fator": float}` — atualiza `fator_aceleracao`; reescalona job APScheduler
   - `POST /engine/scenario` body `{"tipo": str, "duracao_dias": int}` — chama `apply_scenario`
-  - `POST /engine/adjust` body `{"comporta_01": float, ..., "comporta_04": float}` — aplica novos valores de comportas ao estado
+  - `POST /engine/adjust` body `{"comporta_01": float, ..., "comporta_04": float, "turbina": "LIGADO" | "DESLIGADO"}` — aplica novos valores de comportas **e** do estado da turbina ao estado
   - `POST /engine/start` — dispara `run_startup_sequence` em background task
 - [ ] **3.11** Adicionar ao FastAPI do engine um `lifespan` que inicia o APScheduler e o loop de simulação na startup
 
@@ -118,7 +118,7 @@
 
 ### 4a — Estrutura base e state cache
 
-- [ ] **4.1** Criar `backend-api/src/state_cache.py`: objeto `StateCache` singleton com campos `last_tick: dict | None`, `simulated_hours: int`, `paused: bool`, `fator_aceleracao: float`; thread-safe com `asyncio.Lock`
+- [ ] **4.1** Criar `backend-api/src/state_cache.py`: objeto `StateCache` singleton com campos `last_tick: dict | None`, `simulated_hours: int`, `paused: bool`, `paused_reason: str | None` (`"manual"` | `"previsao_critica"` | `None`), `fator_aceleracao: float`; thread-safe com `asyncio.Lock`
 - [ ] **4.2** Criar `backend-api/src/db.py`: configurar SQLAlchemy async engine com `asyncpg`; criar `AsyncSessionLocal`; função `get_db()` como dependency
 
 ### 4b — Endpoint interno e loop de display
@@ -132,9 +132,11 @@
 - [ ] **4.6** Criar `backend-api/src/routers/simulation.py`:
   - `GET /state` — retorna `StateCache` + último `SimulationState` do banco
   - `POST /simulation/start` — POST para `{ENGINE_URL}/engine/start`; retorna 202
+  - `POST /simulation/pause` — POST para `{ENGINE_URL}/engine/pause` com `{"reason": "manual"}`; idempotente — se já pausado, apenas confirma; retorna 200 com `{"ok": true, "paused_reason": <reason em vigor>}`
+  - `POST /simulation/resume` — valida `state_cache.paused_reason`: se `"manual"` (ou não pausado), POST para `{ENGINE_URL}/engine/resume` e retorna 200; se `"previsao_critica"`, retorna 409 com mensagem orientando o uso de `/simulation/adjust`
   - `POST /simulation/speed` body `{"fator": float}` — valida range (0.1–100); POST para `/engine/speed`; retorna 200
   - `POST /simulation/scenario` body `{"tipo": str, "duracao_dias": int}` — POST para `/engine/scenario`; retorna 202
-  - `POST /simulation/adjust` — calcula novos valores de comportas (lógica da Fase 5); POST para `/engine/adjust` com valores calculados; POST para `/engine/resume` se pausado; retorna 200
+  - `POST /simulation/adjust` — calcula novos valores de comportas **e** do estado da turbina (lógica da Fase 5); POST para `/engine/adjust` com os 4 valores de comporta + `turbina`; POST para `/engine/resume` se pausado (independente do motivo); retorna 200 com `ajuste_aplicado` incluindo o campo `turbina`
 - [ ] **4.7** Criar `backend-api/src/routers/history.py`:
   - `GET /history/alerts?page=1&per_page=50` — query paginada em `alert_history`, ordenada por `simulated_timestamp DESC`
   - `GET /history/sensors/{sensor_id}?horas=720` — retorna últimas N leituras do sensor_id ordenadas por timestamp
@@ -181,17 +183,18 @@
   - Para tanque 2: `taxa_liquida_v2 = sensor_fluxo_02 + contribuicao_chuva − sensor_esvaziamento_01`; mesma lógica de overflow/vazio
   - Classificar: `tempo < 24h` → `"CRITICO"` (pausa engine); `24h ≤ tempo < 48h` → `"ALERTA"`; taxa = 0 → sem previsão
 - [ ] **5.7** Criar `backend-api/src/prediction_models.py`: dataclass `Prediction` com `tanque`, `tipo` (overflow/vazio), `tempo_horas` (float), `severidade` (ALERTA/CRÍTICO)
-- [ ] **5.8** No `display_tick`: se alguma previsão for CRÍTICO, fazer POST para `{ENGINE_URL}/engine/pause` e salvar alerta em `alert_history`
+- [ ] **5.8** No `display_tick`: se alguma previsão for CRÍTICO, fazer POST para `{ENGINE_URL}/engine/pause` com `{"reason": "previsao_critica"}` e salvar alerta em `alert_history`
 - [ ] **5.9** Escrever testes unitários para `compute_predictions`: (a) taxa positiva com volume em 50% → tempo correto; (b) taxa zero → sem previsão; (c) tempo < 24h → CRÍTICO
 
 ### 5c — Algoritmo de ajuste automático de comportas
 
-- [ ] **5.10** Criar `backend-api/src/adjustment.py`: função `compute_adjustment(sensors: dict) -> dict` que calcula novos valores de comportas:
+- [ ] **5.10** Criar `backend-api/src/adjustment.py`: função `compute_adjustment(sensors: dict) -> dict` que calcula novos valores de comportas **e** do estado da turbina:
   - Objetivo: levar `sensor_volume_01` e `sensor_volume_02` a 90%
   - Para tanque 1: resolver `sensor_enchimento_01 = sensor_fluxo_01` com margem; ajustar `comporta_01` e/ou `comporta_02`
   - Para tanque 2: ajustar `comporta_03` e `comporta_04` para que `sensor_fluxo_02 ≈ sensor_esvaziamento_01`
   - Restrição: `comporta_02 ≤ comporta_03`; clamp todos entre 0–100%
-  - Retorna dict `{"comporta_01": v, "comporta_02": v, "comporta_03": v, "comporta_04": v}`
+  - Após calcular as comportas, definir `turbina`: `"LIGADO"` se `comporta_02 > 0` E `comporta_03 > 0`; caso contrário `"DESLIGADO"` — mantém o invariante operacional dos Riscos 8 e 9 (turbina ligada sse comportas internas abertas)
+  - Retorna dict `{"comporta_01": v, "comporta_02": v, "comporta_03": v, "comporta_04": v, "turbina": "LIGADO" | "DESLIGADO"}`
 - [ ] **5.11** Escrever teste para `compute_adjustment`: aplicar resultado a `compute_tick` e verificar que taxa_líquida ≈ 0 para ambos os tanques
 - [ ] **5.12** Integrar `compute_adjustment` no endpoint `POST /simulation/adjust` (Fase 4, tarefa 4.6)
 
@@ -217,7 +220,7 @@
 
 ### 6c — Relógio simulado
 
-- [ ] **6.6** Criar `src/components/SimulatedClock.tsx`: receber `simulated_hours` como prop; converter para `Dia D, Mês M de AAAA, às HH:MM` (base: 1 de janeiro de 2024, hora 00:00); exibir com fonte monospace
+- [ ] **6.6** Criar `src/components/SimulatedClock.tsx`: receber `simulated_hours` como prop; converter para `Dia D, Mês M de AAAA, às HH:MM` (base: 1 de janeiro de 2026, hora 00:00); exibir com fonte monospace
 
 ### 6d — Cards de sensores
 
@@ -267,7 +270,7 @@
 
 - [ ] **8.1** Testar sequência completa: `POST /simulation/start` → aguardar volumes ≥ 90% → verificar estado RODANDO → confirmar atualizações WebSocket a 1 Hz
 - [ ] **8.2** Testar `POST /simulation/scenario tipo=chuva_intensa duracao_dias=7`: verificar que `sensor_chuva_01` fica em 20 mm/h por 168 ticks; após período, retorna à série original
-- [ ] **8.3** Testar acionamento de pausa por previsão crítica: ajustar comportas para criar taxa_liquida alta → aguardar previsão CRÍTICO → verificar que engine pausa → verificar badge PAUSADO no frontend
+- [ ] **8.3** Testar acionamento de pausa por previsão crítica: ajustar comportas para criar taxa_liquida alta → aguardar previsão CRÍTICO → verificar que engine pausa com `paused_reason = "previsao_critica"` → verificar badge PAUSADO no frontend. Testar também pausa manual: `POST /simulation/pause` → verificar `paused_reason = "manual"` no broadcast WebSocket → `POST /simulation/resume` → verificar `paused_reason = null` e ticks voltando a avançar. Validar 409 em `/simulation/resume` quando `paused_reason = "previsao_critica"`.
 - [ ] **8.4** Testar `POST /simulation/adjust` com simulação pausada: verificar que comportas são ajustadas, simulação retoma, taxa_liquida ≈ 0
 
 ### 8b — Testes de performance e estabilidade

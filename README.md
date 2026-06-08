@@ -4,7 +4,7 @@ Simulação de uma barragem com painel de monitoramento em tempo real. Stack em
 `docker compose`: PostgreSQL, backend (FastAPI), motor de simulação (FastAPI) e
 front-end (React/Vite servido por nginx).
 
-## Rodar localmente (um único computador)
+## Rodar localmente
 
 Pré-requisito: Docker Desktop instalado e em execução.
 
@@ -29,7 +29,7 @@ docker compose down           # para tudo
 docker compose down -v        # para tudo e apaga o volume do banco
 ```
 
-## Modo apresentação — servidor num notebook, acesso de outro (Opção A)
+## Modo apresentação
 
 Cenário: um notebook hospeda a stack completa; outro computador (ex.: notebook ou
 PC do laboratório) acessa o painel pelo navegador, na mesma rede — incluindo o
@@ -45,6 +45,7 @@ container), então acessar por `http://<IP-do-servidor>:8080` é equivalente a
 1. Conecte **os dois computadores** à mesma rede (hotspot do celular, de preferência —
    evita o isolamento de cliente comum em Wi-Fi de universidade). Não precisa de
    internet/dados móveis: o hotspot já cria a rede local.
+   
 2. No **notebook-servidor**, rode (de preferência em PowerShell **como Administrador**,
    para a regra de firewall ser criada automaticamente):
 
@@ -54,6 +55,7 @@ container), então acessar por `http://<IP-do-servidor>:8080` é equivalente a
 
    O script libera a porta no firewall, sobe a stack e imprime a **URL de acesso**.
    Use `-Build` após mudanças no código; `-NoStart` para só configurar/mostrar a URL.
+   
 3. No **outro computador**, abra a URL mostrada (ex.: `http://192.168.43.5:8080`).
 
 ### Configuração manual (equivalente ao script)
@@ -68,13 +70,3 @@ ipconfig   # use o IPv4 do adaptador conectado ao hotspot
 # 3. Subir a stack
 docker compose up -d
 ```
-
-### Solução de problemas
-
-- **Não abre no outro computador:** teste `ping <IP-do-servidor>`. Se não responde,
-  é a rede bloqueando (isolamento de cliente) — use o hotspot do celular ou um
-  cabo/switch próprio, não o Wi-Fi da instituição.
-- **IP mudou:** o endereço é distribuído por DHCP e pode mudar a cada sessão; rode o
-  script (ou `ipconfig`) novamente para obter o atual.
-- **Porta 8080 ocupada:** altere `FRONTEND_PORT` no `.env` (o script lê esse valor) e
-  suba de novo.
